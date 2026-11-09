@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>OX | Pesquisa Empresarial P0 · v0.4 online</title>
+  <link rel="stylesheet" href="./app.css">
+  <script src="./config.js"></script>
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div><span class="eyebrow">OX PESQUISA / DEMONSTRAÇÃO PRIVADA</span><h1>Pesquisa Empresarial</h1><p>Consulta de empresas com fontes identificadas e retorno padronizado.</p></div>
+      <div class="status-label"><span id="session-label">ACESSO PRIVADO · LOGIN NECESSÁRIO</span></div>
+    </header>
+    <section class="card query" id="auth-panel">
+      <div class="tools-heading"><h2>Acesso privado à OX Pesquisa</h2><button type="button" id="auth-logout" hidden>Sair</button></div>
+      <form id="auth-login" class="fields"><label>E-mail autorizado <input type="email" name="email" required autocomplete="username"></label><label>Senha <input type="password" name="password" required autocomplete="current-password"></label><button type="submit" class="primary">Entrar</button></form>
+      <button id="auth-forgot" type="button">Definir ou recuperar minha senha</button>
+      <form id="auth-reset" class="fields" hidden>
+        <label>E-mail do convite <input name="email" type="email" required autocomplete="email"></label>
+        <button class="primary" type="submit">Enviar link de recuperação</button>
+      </form>
+      <form id="auth-set-password" class="fields" hidden>
+        <p>Link de convite ou recuperação recebido. Defina uma senha de pelo menos 12 caracteres.</p>
+        <label>Nova senha <input name="password" type="password" minlength="12" maxlength="128" required autocomplete="new-password"></label>
+        <label>Confirmar senha <input name="confirm" type="password" minlength="12" maxlength="128" required autocomplete="new-password"></label>
+        <button class="primary" type="submit">Definir senha</button>
+      </form>
+      <p id="auth-feedback" role="status">Faça login para executar consultas.</p>
+      <p class="source-summary">Sessão mantida apenas em memória. Ao recarregar a página, faça login novamente. Não cadastre contas abertas ao público.</p>
+    </section><section class="card query">
+      <div class="tabs"><button id="tab-search" class="selected" type="button">Buscar empresas</button><button id="tab-cnpj" type="button">Consultar CNPJ</button></div>
+      <form id="form-search" class="fields">
+        <label>Fonte da lista<select name="source"><option value="minhareceita" selected>Minha Receita (online)</option><option value="rictom_local" disabled>Receita local rictom (somente Windows)</option></select></label>
+        <label>Estado <select name="uf" required>
+          <option value="PA">Pará</option><option value="MA">Maranhão</option><option value="AP">Amapá</option><option value="TO">Tocantins</option><option value="PI">Piauí</option><option value="CE">Ceará</option><option value="AM">Amazonas</option><option value="RR">Roraima</option><option value="RO">Rondônia</option><option value="AC">Acre</option><option value="SP">São Paulo</option><option value="RJ">Rio de Janeiro</option><option value="MG">Minas Gerais</option><option value="BA">Bahia</option><option value="PR">Paraná</option><option value="RS">Rio Grande do Sul</option><option value="SC">Santa Catarina</option><option value="ES">Espírito Santo</option><option value="PE">Pernambuco</option><option value="PB">Paraíba</option><option value="RN">Rio Grande do Norte</option><option value="AL">Alagoas</option><option value="SE">Sergipe</option><option value="DF">Distrito Federal</option><option value="MS">Mato Grosso do Sul</option><option value="MT">Mato Grosso</option><option value="GO">Goiás</option>
+        </select></label>
+        <label>Atividade <select name="cnae" required><option value="4731800">Postos de combustíveis</option><option value="4930202">Transporte rodoviário intermunicipal/interestadual</option><option value="4930201">Transporte rodoviário municipal</option><option value="4930203">Transporte de produtos perigosos</option><option value="4732600">Comércio de lubrificantes</option></select></label>
+        <label>Resultados por pesquisa <select name="limit"><option>20</option><option>50</option><option>100</option><option selected>200</option></select></label>
+        <button type="submit" class="primary">Pesquisar empresas</button>
+      </form>
+      <form id="form-cnpj" class="fields hide">
+        <label>CNPJ <input name="cnpj" placeholder="00.000.000/0000-00" required maxlength="20" autocomplete="off"></label>
+        <label>Fonte <select name="source"><option value="auto">Automático (com alternativas)</option><option value="opencnpj">OpenCNPJ</option><option value="minhareceita">Minha Receita</option><option value="brasilapi">BrasilAPI</option><option value="cnpjws">CNPJ.ws</option><option value="rictom_local" disabled>Receita local rictom (somente Windows)</option></select></label>
+        <button type="submit" class="primary">Consultar CNPJ</button>
+      </form>
+      <p class="source-summary">Busca por segmento: <strong>Minha Receita</strong>, ou <strong>rictom/cnpj_api local</strong> se instalada e habilitada. Consulta individual: OpenCNPJ → Minha Receita → BrasilAPI → CNPJ.ws (alternativas); Receita local é opcional. Redes sociais: somente links encontrados em sites informados, sem coletar perfis das redes.</p>
+      <div class="feedback" id="feedback" role="status" aria-live="polite">Pronto para iniciar. Nenhum dado real foi consultado.</div>
+    </section>
+    <section class="card extra-tools">
+      <div class="tools-heading"><div><span class="eyebrow">NOVO · v0.4</span><h2>Enriquecer por site empresarial</h2><p><strong>Em pausa na edição online:</strong> o enriquecimento de URLs fornecidas pelo usuário será reativado após revisão anti-SSRF. No Windows, permanece disponível na v0.4 local.</p></div><span class="mini-status">Uma página por ação</span></div>
+      <form id="form-enrich" class="fields secondary-fields">
+        <label>Site empresarial (HTTPS) <input type="url" name="website" id="site-url" placeholder="https://empresa.com.br" required></label>
+        <label>CNPJ já carregado (opcional) <input name="cnpj" id="site-cnpj" placeholder="CNPJ para associar resultado"></label>
+        <button class="primary" type="submit" disabled title="Indisponível online nesta etapa">Localizar links públicos (em revisão)</button>
+      </form>
+      <div id="enrich-result" class="small-result" role="status">Ainda não foi consultado um site.</div>
+      <button id="apply-enrich" type="button" hidden>Adicionar dados encontrados à empresa carregada (somente nesta tela)</button>
+    </section>
+    <section class="card extra-tools">
+      <div class="tools-heading"><div><h2>Google Places oficial (opcional)</h2><p>Consulta temporária de estabelecimentos. Requer chave privada do Google Maps Platform e habilitação explícita; pode gerar cobrança. Não será armazenada nem exportada como base comercial.</p></div><span class="mini-status">Sem scraping de Maps</span></div>
+      <form id="form-places" class="fields secondary-fields">
+        <label>Localização / tipo de estabelecimento <input name="q" placeholder="Postos de combustíveis em Belém, PA" required minlength="3" maxlength="120"></label>
+        <label>Resultados <select name="limit"><option>5</option><option selected>10</option><option>20</option></select></label>
+        <button class="primary" type="submit">Consultar Google Places</button>
+      </form>
+      <div id="places-result" class="small-result" role="status">Integração desabilitada por padrão. Se não houver chave, mostraremos instruções de configuração.</div>
+    </section>
+    <section class="card extra-tools">
+      <h2>Fontes e integrações desta versão</h2>
+      <p class="source-summary" id="sources-detail">Consultando status local dos módulos...</p>
+    </section>
+    <section class="kpis" aria-label="Indicadores dos registros carregados">
+      <div><small>Recebidos</small><strong id="count-total">0</strong></div>
+      <div><small>Ativos</small><strong id="count-active">0</strong></div>
+      <div><small>Com telefone</small><strong id="count-phone">0</strong></div>
+      <div><small>Com e-mail</small><strong id="count-email">0</strong></div>
+      <div><small>Móveis candidatos (não verificados)</small><strong id="count-mobile">0</strong></div>
+    </section>
+    <section class="card results">
+      <div class="results-head"><div><h2>Empresas encontradas</h2><p id="summary">Nenhuma consulta realizada.</p></div><div class="export-controls"><label for="export-format">Formato de exportação</label><select id="export-format" disabled aria-label="Formato do arquivo"><option value="xlsx" selected>Excel .xlsx</option><option value="xls">Excel .xls (legado)</option><option value="csv">CSV .csv</option></select><button id="export" type="button" disabled>Baixar todos os registros</button></div></div><p class="export-hint" id="export-count">A exportação não depende da página visual.</p>
+      <div class="filter"><label>Filtrar registros carregados <input type="search" id="filter" placeholder="Cidade, empresa, CNPJ ou contato"></label><label class="check"><input type="checkbox" id="active" checked> Somente ativas</label><label class="check"><input type="checkbox" id="contact"> Com contato</label></div>
+      <div class="table-container"><table><thead><tr><th>CNPJ</th><th>Razão social / Fantasia</th><th>Cidade</th><th>UF</th><th>Telefone</th><th>E-mail</th><th>Redes / Site</th><th>Situação</th><th>Fonte</th></tr></thead><tbody id="records"><tr><td colspan="9" class="empty">Escolha uma pesquisa acima.</td></tr></tbody></table></div>
+      <div class="paging"><span id="page-info">Paginação ainda não iniciada.</span><button type="button" id="more" hidden>Carregar outro lote (opcional)</button></div><div class="visual-paging"><label for="per-page">Linhas visíveis:</label><select id="per-page"><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option></select><button type="button" id="prev-table">Anterior</button><span id="table-page">Página 1 de 1</span><button type="button" id="next-table">Próxima</button></div>
+    </section>
+    <footer>A exportação usa TODOS os registros carregados na pesquisa de empresas, inclusive páginas visuais não exibidas. Resultados transitórios do Google Places não entram nas exportações. Até 200 resultados por lote; outros lotes são opcionais. A interface utiliza uma Edge Function privada do Supabase para consultar APIs externas. Não envia mensagens nem modifica CRM, GitHub, VPS ou Painel OX. Os filtros locais trabalham apenas com os registros carregados; o campo “com contato” não confirma a validade do número ou do e-mail.</footer>
+  </main>
+</body>
+</html>
