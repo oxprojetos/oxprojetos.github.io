@@ -259,7 +259,7 @@ async function runMultipleCnaes(cnaes, data) {
     for (const [index, cnae] of cnaes.entries()) {
       let receivedForCnae = 0, pagesForCnae = 0, nextCursor = null;
       const usedCursors = new Set();
-      message(\`Consultando CNAE \${cnae} (\${index + 1}/\${cnaes.length})... \${rows.length} empresas distintas.\`);
+      message(`Consultando CNAE ${cnae} (${index + 1}/${cnaes.length})... ${rows.length} empresas distintas.`);
       do {
         if (signal.aborted) throw Object.assign(new Error('Cancelado'), {name:'AbortError'});
         if (pagesForCnae >= 10) throw new Error('O CNAE ' + cnae + ' excedeu o limite de 10 páginas.');
@@ -271,7 +271,7 @@ async function runMultipleCnaes(cnaes, data) {
         let result;
         try { result = await response.json(); }
         catch { throw new Error('Resposta HTTP ' + response.status + ' não contém JSON válido.'); }
-        if (!response.ok) throw new Error(\`CNAE \${cnae}: \${result?.message || result?.error || 'HTTP ' + response.status}\`);
+        if (!response.ok) throw new Error(`CNAE ${cnae}: ${result?.message || result?.error || 'HTTP ' + response.status}`);
         if (!Array.isArray(result.data)) throw new Error('CNAE ' + cnae + ': resposta sem lista de empresas.');
         const remaining = perCnae - receivedForCnae;
         const chunk = result.data.slice(0, remaining);
@@ -300,7 +300,7 @@ async function runMultipleCnaes(cnaes, data) {
       render();
     }
     state.complete = true;
-    message(\`Pesquisa concluída: \${cnaes.length} CNAEs consultados, \${rows.length} CNPJs distintos carregados. A exportação inclui somente os registros recebidos.\`, 'ok');
+    message(`Pesquisa concluída: ${cnaes.length} CNAEs consultados, ${rows.length} CNPJs distintos carregados. A exportação inclui somente os registros recebidos.`, 'ok');
   } catch (error) {
     if (error.name !== 'AbortError') {
       state.partialError = true; // Nunca liberar exportação de uma pesquisa multi-CNAE incompleta.
