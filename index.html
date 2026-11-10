@@ -4,18 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <title>OX | Pesquisa Empresarial P0 · v0.4 online</title>
+  <title>OX Pesquisa Pro | Inteligência Empresarial v0.4</title>
   <link rel="stylesheet" href="./app.css">
   <script src="./config.js"></script>
   <script type="module" src="./app.js"></script>
+  <script defer src="./pro-ui.js"></script>
 </head>
-<body>
-  <main class="app">
+<body class="pro-locked">
+  <main class="app pro-app">
+<aside class="pro-sidebar" id="pro-sidebar" hidden aria-label="Navegação OX Pesquisa"><div class="pro-brand"><span class="pro-logo">OX</span><span><strong>OX Pesquisa</strong><small>INTELIGÊNCIA EMPRESARIAL</small></span></div><span class="pro-sidebar-label">ESPAÇO DE TRABALHO</span><nav class="pro-navigation" aria-label="Menu principal"><button type="button" class="pro-nav-button active" id="pro-nav-search">▦ &nbsp; Buscar empresas</button><button type="button" class="pro-nav-button" id="pro-nav-cnpj">⌕ &nbsp; Consultar CNPJ</button><button type="button" class="pro-nav-button" id="pro-nav-sources">◎ &nbsp; Fontes e integrações</button></nav><div class="pro-sidebar-spacer"></div><div class="pro-sidebar-note"><strong>♧ Privacidade em primeiro lugar</strong><span>Sem banco de empresas nesta fase. Consulte somente fontes autorizadas.</span></div><div class="pro-sidebar-account"><span class="pro-avatar">OX</span><span><strong>Área privada</strong><small>OX Pesquisa · v0.4</small></span></div></aside><div class="pro-mobile-scrim" id="pro-mobile-scrim" hidden></div><div class="pro-workspace"><div class="pro-topbar"><button type="button" id="pro-menu-toggle" aria-expanded="false" aria-label="Abrir menu e filtros">☰</button><strong>OX Pesquisa <span>Pro</span></strong><div class="pro-topbar-spacer"></div><span class="pro-session-chip">● Acesso privado</span><button type="button" id="pro-top-logout">Sair</button></div>
     <header>
       <div><span class="eyebrow">OX PESQUISA / DEMONSTRAÇÃO PRIVADA</span><h1>Pesquisa Empresarial</h1><p>Consulta de empresas com fontes identificadas e retorno padronizado.</p></div>
       <div class="status-label"><span id="session-label">ACESSO PRIVADO · LOGIN NECESSÁRIO</span></div>
     </header>
-    <section class="card query" id="auth-panel">
+    <section class="card query" id="auth-panel"><div class="pro-login-hero"><div class="pro-login-brand"><span class="pro-logo">OX</span><strong>OX Pesquisa</strong></div><div class="pro-login-copy"><small>INTELIGÊNCIA EMPRESARIAL</small><h2>Dados melhores.<br>Decisões mais rápidas.</h2><p>Pesquise empresas, encontre contatos e organize oportunidades comerciais com informações de fontes identificadas.</p><div class="pro-login-perks"><span>✓ Consulta por CNPJ</span><span>✓ Pesquisa por segmento</span><span>✓ Exportação estruturada</span></div></div><span class="pro-login-foot">OX Pesquisa · acesso privado</span></div><div class="pro-login-card">
       <div class="tools-heading"><h2>Acesso privado à OX Pesquisa</h2><button type="button" id="auth-logout" hidden>Sair</button></div>
       <form id="auth-login" class="fields"><label>E-mail autorizado <input type="email" name="email" required autocomplete="username"></label><label>Senha <input type="password" name="password" required autocomplete="current-password"></label><button type="submit" class="primary">Entrar</button></form>
       <button id="auth-forgot" type="button">Definir ou recuperar minha senha</button>
@@ -31,8 +33,8 @@
       </form>
       <p id="auth-feedback" role="status">Faça login para executar consultas.</p>
       <p class="source-summary">Sessão mantida apenas em memória. Ao recarregar a página, faça login novamente. Não cadastre contas abertas ao público.</p>
-    </section><section class="card query">
-      <div class="tabs"><button id="tab-search" class="selected" type="button">Buscar empresas</button><button id="tab-cnpj" type="button">Consultar CNPJ</button></div>
+    </div></section><div class="pro-main-body" id="pro-main-body" hidden><div class="pro-intro"><div><span class="pro-intro-eyebrow">CENTRAL DE INTELIGÊNCIA</span><h2>Pesquisa empresarial</h2><p>Consulte empresas, refine resultados e organize suas oportunidades.</p></div><span class="pro-demand-chip">● Consulta sob demanda</span></div><div class="pro-workspace-grid"><section class="card query pro-search-card">
+      <div class="pro-filters-heading"><span>☷</span><div><h2>Filtros de pesquisa</h2><p>Refine sua busca por empresas.</p></div></div><div class="tabs"><button id="tab-search" class="selected" type="button">Buscar empresas</button><button id="tab-cnpj" type="button">Consultar CNPJ</button></div>
       <form id="form-search" class="fields">
         <label>Fonte da lista<select name="source"><option value="minhareceita" selected>Minha Receita (online)</option><option value="rictom_local" disabled>Receita local rictom (somente Windows)</option></select></label>
         <label>Estado <select name="uf" required>
@@ -80,13 +82,13 @@
       <div><small>Com e-mail</small><strong id="count-email">0</strong></div>
       <div><small>Móveis candidatos (não verificados)</small><strong id="count-mobile">0</strong></div>
     </section>
-    <section class="card results">
+    <section class="card results pro-results-card">
       <div class="results-head"><div><h2>Empresas encontradas</h2><p id="summary">Nenhuma consulta realizada.</p></div><div class="export-controls"><label for="export-format">Formato de exportação</label><select id="export-format" disabled aria-label="Formato do arquivo"><option value="xlsx" selected>Excel .xlsx</option><option value="xls">Excel .xls (legado)</option><option value="csv">CSV .csv</option></select><button id="export" type="button" disabled>Baixar todos os registros</button></div></div><p class="export-hint" id="export-count">A exportação não depende da página visual.</p>
       <div class="filter"><label>Filtrar registros carregados <input type="search" id="filter" placeholder="Cidade, empresa, CNPJ ou contato"></label><label class="check"><input type="checkbox" id="active" checked> Somente ativas</label><label class="check"><input type="checkbox" id="contact"> Com contato</label></div>
       <div class="table-container"><table><thead><tr><th>CNPJ</th><th>Razão social / Fantasia</th><th>Cidade</th><th>UF</th><th>Telefone</th><th>E-mail</th><th>Redes / Site</th><th>Situação</th><th>Fonte</th></tr></thead><tbody id="records"><tr><td colspan="9" class="empty">Escolha uma pesquisa acima.</td></tr></tbody></table></div>
       <div class="paging"><span id="page-info">Paginação ainda não iniciada.</span><button type="button" id="more" hidden>Carregar outro lote (opcional)</button></div><div class="visual-paging"><label for="per-page">Linhas visíveis:</label><select id="per-page"><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option></select><button type="button" id="prev-table">Anterior</button><span id="table-page">Página 1 de 1</span><button type="button" id="next-table">Próxima</button></div>
     </section>
     <footer>A exportação usa TODOS os registros carregados na pesquisa de empresas, inclusive páginas visuais não exibidas. Resultados transitórios do Google Places não entram nas exportações. Até 200 resultados por lote; outros lotes são opcionais. A interface utiliza uma Edge Function privada do Supabase para consultar APIs externas. Não envia mensagens nem modifica CRM, GitHub, VPS ou Painel OX. Os filtros locais trabalham apenas com os registros carregados; o campo “com contato” não confirma a validade do número ou do e-mail.</footer>
-  </main>
+    </div></div></div></main>
 </body>
 </html>
