@@ -106,16 +106,31 @@ function whatsappGlyph() {
   return svg;
 }
 function phoneCell(tr, row) {
-  const td = document.createElement('td'); td.className = 'contact-cell';
-  const val = document.createElement('span'); val.textContent = row.telefone || '—'; td.append(val);
-  // Somente números com formato de celular brasileiro recebem botão; não há verificação de cadastro.
-  for (const candidate of mobileCandidatesDetailed(row.telefone)) {
-    const mobile = candidate.number;
-    const title = candidate.adjusted
-      ? `Possível celular antigo: nono dígito acrescentado conforme regra Anatel. Abrir WhatsApp para ${mobile.slice(2)} (número e conta não verificados)`
-      : `Abrir WhatsApp para ${mobile.slice(2)} (cadastro não verificado)`;
-    const link = actionLink(td, '', `https://wa.me/${mobile}`, title, candidate.adjusted ? 'whatsapp-icon whatsapp-legacy' : 'whatsapp-icon');
-    link.append(whatsappGlyph());
+  const td = document.createElement('td');
+  td.className = 'contact-cell';
+  const text = String(row.telefone ?? '').trim();
+  const parts = text ? text.split(/\s*\/\s*|\s*;\s*|\s*,\s*/).map(s => s.trim()).filter(Boolean) : [];
+  const displayed = parts.length ? parts : ['—'];
+  const unique = new Set();
+  for (const rawPhone of displayed) {
+    const line = document.createElement('div');
+    line.className = 'phone-line';
+    const val = document.createElement('span');
+    val.className = 'phone-number';
+    val.textContent = rawPhone;
+    line.append(val);
+    // Link somente para candidato de celular, sem validação de conta nem envio.
+    for (const candidate of mobileCandidatesDetailed(rawPhone)) {
+      if (unique.has(candidate.number)) continue;
+      unique.add(candidate.number);
+      const mobile = candidate.number;
+      const title = candidate.adjusted
+        ? `Possível celular antigo: nono dígito acrescentado conforme regra Anatel. Abrir WhatsApp para ${mobile.slice(2)} (número e conta não verificados)`
+        : `Abrir WhatsApp para ${mobile.slice(2)} (cadastro não verificado)`;
+      const link = actionLink(line, '', `https://wa.me/${mobile}`, title, candidate.adjusted ? 'whatsapp-icon whatsapp-legacy' : 'whatsapp-icon');
+      link.append(whatsappGlyph());
+    }
+    td.append(line);
   }
   tr.append(td);
 }
