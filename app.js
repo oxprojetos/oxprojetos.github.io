@@ -39,12 +39,31 @@ function actionLink(parent, label, href, title, className) {
   a.className = className; a.title = title; a.setAttribute('aria-label', title);
   parent.append(a); return a;
 }
+// Símbolo vetorial local, sem CDN e sem consultar a existência de conta WhatsApp.
+function whatsappGlyph() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  for (const d of [
+    'M20 11.6a8.2 8.2 0 0 1-12 7.2L3.7 20l1.3-4.1A8.2 8.2 0 1 1 20 11.6Z',
+    'M8.2 8.3c.3-.4.8-.4 1.1-.1l1.3 1.4c.3.3.3.7.1 1l-.6.8a8.5 8.5 0 0 0 2.5 2.5l.8-.6c.3-.2.7-.2 1 .1l1.4 1.3c.3.3.3.8-.1 1.1-.5.5-1.2.7-1.9.5-2.2-.5-5-3.3-5.5-5.5-.2-.7 0-1.4.5-1.9Z'
+  ]) {
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', d);
+    svg.append(path);
+  }
+  return svg;
+}
 function phoneCell(tr, row) {
   const td = document.createElement('td'); td.className = 'contact-cell';
   const val = document.createElement('span'); val.textContent = row.telefone || '—'; td.append(val);
-  const candidates = mobileCandidates(row.telefone);
-  for (const mobile of candidates) {
-    actionLink(td, '☎', `https://wa.me/${mobile}`, `Abrir WhatsApp manualmente para ${mobile.slice(2)} (conta NÃO verificada)`, 'whatsapp-icon');
+  // Somente números com formato de celular brasileiro recebem botão; não há verificação de cadastro.
+  for (const mobile of mobileCandidates(row.telefone)) {
+    const title = `Abrir WhatsApp para ${mobile.slice(2)} (cadastro não verificado)`;
+    const link = actionLink(td, '', `https://wa.me/${mobile}`, title, 'whatsapp-icon');
+    link.append(whatsappGlyph());
   }
   tr.append(td);
 }
