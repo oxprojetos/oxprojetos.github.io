@@ -27,15 +27,15 @@
   };
   nav.search.addEventListener('click', () => {
     $('tab-search').click(); setActive('search'); menu(false);
-    document.querySelector('.pro-search-card').scrollIntoView({behavior:'smooth',block:'start'});
+    document.querySelector('.pro-search-card').scrollIntoView({behavior:'instant',block:'start'});
   });
   nav.cnpj.addEventListener('click', () => {
     $('tab-cnpj').click(); setActive('cnpj'); menu(false);
-    document.querySelector('.pro-search-card').scrollIntoView({behavior:'smooth',block:'start'});
+    document.querySelector('.pro-search-card').scrollIntoView({behavior:'instant',block:'start'});
   });
   nav.sources.addEventListener('click', () => {
     setActive('sources');menu(false);
-    $('sources-detail').closest('.extra-tools').scrollIntoView({behavior:'smooth',block:'start'});
+    $('sources-detail').closest('.extra-tools').scrollIntoView({behavior:'instant',block:'start'});
   });
   $('tab-search').addEventListener('click', () => setActive('search'));
   $('tab-cnpj').addEventListener('click', () => setActive('cnpj'));
