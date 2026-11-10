@@ -296,3 +296,52 @@ body.pro-authenticated #auth-panel{display:none!important}
 .pro-results-card .results-head{
   position:relative!important;top:auto!important;z-index:auto!important;
 }
+
+
+/* WPP-01: WhatsApp icon visually compact, one action beside each phone.
+   The hit area remains 44 x 44 CSS px on touch devices. */
+.contact-cell .phone-line {
+  display:flex; align-items:center; justify-content:flex-start;
+  flex-wrap:nowrap; min-height:32px; gap:4px; max-width:100%;
+}
+.contact-cell .phone-number {
+  display:inline-block; min-width:0; flex:0 1 auto;
+  color:inherit; font-size:12px; line-height:1.45;
+  overflow-wrap:anywhere; white-space:normal;
+}
+.contact-cell .whatsapp-icon,
+.contact-cell .whatsapp-legacy {
+  width:36px; height:36px; min-width:36px; min-height:36px;
+  flex:0 0 36px; padding:0; margin:0;
+  background:transparent!important; color:#128c4a;
+  border-radius:50%; box-shadow:none;
+  vertical-align:middle; position:relative;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.contact-cell .whatsapp-icon svg {
+  width:23px; height:23px; padding:3px; box-sizing:border-box;
+  background:#128c4a; color:white; border-radius:50%;
+  fill:none; stroke:currentColor; stroke-width:1.9;
+}
+.contact-cell .whatsapp-icon:hover,
+.contact-cell .whatsapp-legacy:hover {
+  background:transparent!important; box-shadow:none;
+}
+.contact-cell .whatsapp-icon:hover svg { background:#086d38; }
+.contact-cell .whatsapp-legacy::after {
+  content:'9+'; top:1px; right:0;
+  min-width:12px; height:12px; width:12px;
+  font-size:7px; font-weight:800; line-height:1;
+  border:1px solid #c8a85b; background:#fff6d8; color:#865a00;
+  pointer-events:none;
+}
+@media(pointer:coarse), (max-width:600px) {
+  .contact-cell .whatsapp-icon,
+  .contact-cell .whatsapp-legacy {
+    width:44px;height:44px;min-width:44px;min-height:44px;flex-basis:44px;
+  }
+}
+@media(max-width:520px) {
+  .contact-cell .phone-line { gap:2px; }
+  .contact-cell .phone-number { font-size:11px; }
+}
