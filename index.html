@@ -40,7 +40,22 @@
         <label>Estado <select name="uf" required>
           <option value="PA">Pará</option><option value="MA">Maranhão</option><option value="AP">Amapá</option><option value="TO">Tocantins</option><option value="PI">Piauí</option><option value="CE">Ceará</option><option value="AM">Amazonas</option><option value="RR">Roraima</option><option value="RO">Rondônia</option><option value="AC">Acre</option><option value="SP">São Paulo</option><option value="RJ">Rio de Janeiro</option><option value="MG">Minas Gerais</option><option value="BA">Bahia</option><option value="PR">Paraná</option><option value="RS">Rio Grande do Sul</option><option value="SC">Santa Catarina</option><option value="ES">Espírito Santo</option><option value="PE">Pernambuco</option><option value="PB">Paraíba</option><option value="RN">Rio Grande do Norte</option><option value="AL">Alagoas</option><option value="SE">Sergipe</option><option value="DF">Distrito Federal</option><option value="MS">Mato Grosso do Sul</option><option value="MT">Mato Grosso</option><option value="GO">Goiás</option>
         </select></label>
-        <label>Atividade <select name="cnae" required><option value="4731800">Postos de combustíveis</option><option value="4930202">Transporte rodoviário intermunicipal/interestadual</option><option value="4930201">Transporte rodoviário municipal</option><option value="4930203">Transporte de produtos perigosos</option><option value="4732600">Comércio de lubrificantes</option></select></label>
+        <div class="cnae-selector">
+          <label for="cnae-input">Atividades / CNAEs <span class="cnae-count" id="cnae-count">1/5</span>
+            <input id="cnae-input" type="text" inputmode="text" list="cnae-suggestions" maxlength="100" placeholder="Digite o CNAE, ex.: 4731800" autocomplete="off" aria-describedby="cnae-hint">
+          </label>
+          <datalist id="cnae-suggestions">
+            <option value="4731800" label="Postos de combustíveis"></option>
+            <option value="4930202" label="Transporte intermunicipal e interestadual"></option>
+            <option value="4930201" label="Transporte municipal"></option>
+            <option value="4930203" label="Transporte de produtos perigosos"></option>
+            <option value="4732600" label="Comércio de lubrificantes"></option>
+          </datalist>
+          <button type="button" id="cnae-add" class="cnae-add">+ Adicionar CNAE</button>
+          <div id="cnae-chips" class="cnae-chips" role="group" aria-label="CNAEs selecionados"></div>
+          <small id="cnae-hint" class="cnae-hint">Digite qualquer código CNAE válido de 7 dígitos. Pode colar vários separados por vírgula ou ponto e vírgula. Até 5 CNAEs, consultados separadamente, com resultados reunidos.</small>
+          <span id="cnae-feedback" class="cnae-feedback" role="status" aria-live="polite"></span>
+        </div>
         <label>Resultados por pesquisa <select name="limit"><option>20</option><option>50</option><option>100</option><option selected>200</option></select></label>
         <button type="submit" class="primary">Pesquisar empresas</button>
       </form>
