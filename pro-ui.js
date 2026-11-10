@@ -53,7 +53,6 @@
     if (!authenticated) {closeDetail();closeColumns();}
   };
   new MutationObserver(applyAuth).observe(authLogout, {attributes:true,attributeFilter:['hidden']});
-  applyAuth();
 
   // Move only filter DOM nodes: IDs, input values, events and query/export logic are preserved.
   const localFilters = document.querySelector('.pro-results-card .filter');
@@ -153,4 +152,6 @@
     });
     panel.hidden=false;overlay.hidden=false;
   });
+  // All dialog and column elements must exist before initial authentication state is applied.
+  applyAuth();
 })();
