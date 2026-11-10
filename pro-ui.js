@@ -16,6 +16,7 @@
     body.classList.toggle('pro-menu-open', visible);
     scrim.hidden = !visible;
     menuButton.setAttribute('aria-expanded', String(visible));
+    menuButton.setAttribute('aria-label', visible ? 'Fechar menu' : 'Abrir menu');
     // Off-screen navigation must not be focusable by keyboard or assistive technology.
     const unavailable = authLogout.hidden || (compact.matches && !visible);
     sidebar.inert = unavailable;
@@ -24,7 +25,7 @@
   };
   compact.addEventListener('change', () => menu(false));
   menuButton.addEventListener('click', () => menu(!body.classList.contains('pro-menu-open')));
-  scrim.addEventListener('click', () => menu(false));
+  scrim.addEventListener('click', () => menu(false, true));
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       if (!panel.hidden) { e.preventDefault(); closeDetail(); return; }
@@ -49,15 +50,15 @@
     }
   };
   nav.search.addEventListener('click', () => {
-    $('tab-search').click(); setActive('search'); menu(false);
+    $('tab-search').click(); setActive('search'); menu(false, true);
     document.querySelector('.pro-search-card').scrollIntoView({behavior:'instant',block:'start'});
   });
   nav.cnpj.addEventListener('click', () => {
-    $('tab-cnpj').click(); setActive('cnpj'); menu(false);
+    $('tab-cnpj').click(); setActive('cnpj'); menu(false, true);
     document.querySelector('.pro-search-card').scrollIntoView({behavior:'instant',block:'start'});
   });
   nav.sources.addEventListener('click', () => {
-    setActive('sources');menu(false);
+    setActive('sources');menu(false, true);
     $('sources-detail').closest('.extra-tools').scrollIntoView({behavior:'instant',block:'start'});
   });
   $('tab-search').addEventListener('click', () => setActive('search'));
@@ -188,11 +189,13 @@
   const dl = document.createElement('dl');
   panel.append(close,document.createTextNode('PERFIL DA EMPRESA'),heading,subtitle,dl);
   body.append(overlay,panel);
+  const workspaceRoot = document.querySelector('.pro-app');
   let previousFocus = null;
   function closeDetail(restoreFocus = true) {
     if (panel.hidden) return;
     panel.hidden = true;
     overlay.hidden = true;
+    workspaceRoot.inert = false;
     if (restoreFocus && previousFocus?.isConnected && !authLogout.hidden) {
       previousFocus.focus({preventScroll:true});
     }
@@ -215,6 +218,7 @@
     previousFocus = trigger?.isConnected ? trigger : document.activeElement;
     panel.hidden = false;
     overlay.hidden = false;
+    workspaceRoot.inert = true;
     close.focus({preventScroll:true});
   }
   table.tBodies[0].addEventListener('click', e => {
