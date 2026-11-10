@@ -1,11 +1,60 @@
 import { apiFetch,signIn,signOut,loggedIn,configured,beginPasswordSetup,requestPasswordReset,updatePassword } from './ox-auth.mjs';
 import { exportBytes } from './exporters.mjs';
 import { validateCnpj } from './cnpj-validation.mjs';
-import { mobileCandidates, emailAddress, safeExternalUrl } from './contacts.mjs';
+import { mobileCandidates, mobileCandidatesDetailed, emailAddress, safeExternalUrl } from './contacts.mjs';
+import { addCnaeCodes, describeCnae, MAX_CNAES } from './cnae-multi.mjs';
 
 const $ = id => document.getElementById(id);
-let rows = [], cursor = null, page = 0, mode = 'search', query = null, controller = null, tablePage = 1;
+let rows = [], cursor = null, page = 0, mode = 'search', query = null, controller = null, tablePage = 1, multiCnaeActive = false;
 const state = { busy: false, requested: 0, complete: false, partialError: false };
+
+let selectedCnaes = ['4731800'];
+function renderCnaes() {
+  const box = $('cnae-chips');
+  box.replaceChildren();
+  for (const code of selectedCnaes) {
+    const chip = document.createElement('span');
+    chip.className = 'cnae-chip';
+    const caption = document.createElement('span');
+    caption.textContent = code + ' · ' + describeCnae(code);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.textContent = '×';
+    remove.setAttribute('aria-label', 'Remover CNAE ' + code);
+    remove.addEventListener('click', () => {
+      if (state.busy) return;
+      selectedCnaes = selectedCnaes.filter(x => x !== code);
+      renderCnaes();
+    });
+    chip.append(caption, remove);
+    box.append(chip);
+  }
+  $('cnae-count').textContent = selectedCnaes.length + '/' + MAX_CNAES;
+}
+function addTypedCnaes() {
+  const field = $('cnae-input');
+  const value = field.value;
+  const next = addCnaeCodes(selectedCnaes, value);
+  if (!next.ok) {
+    $('cnae-feedback').textContent = next.error;
+    return false;
+  }
+  selectedCnaes = next.codes;
+  field.value = '';
+  $('cnae-feedback').textContent = '';
+  renderCnaes();
+  return true;
+}
+$('cnae-add').addEventListener('click', () => {
+  if (!state.busy) addTypedCnaes();
+});
+$('cnae-input').addEventListener('keydown', event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    if (!state.busy) addTypedCnaes();
+  }
+});
+renderCnaes();
 
 function switchMode(newMode) {
   controller?.abort(); mode = newMode;
@@ -17,7 +66,7 @@ function switchMode(newMode) {
 }
 function message(msg, type = '') { $('feedback').textContent = msg; $('feedback').className = `feedback ${type}`; }
 function reset() {
-  rows = []; cursor = null; page = 0; query = null; tablePage = 1;
+  rows = []; cursor = null; page = 0; query = null; tablePage = 1; multiCnaeActive = false;
   state.requested = 0; state.complete = false; state.partialError = false;
   $('filter').value = ''; message('Pronto para iniciar uma nova consulta.'); render();
 }
@@ -60,9 +109,12 @@ function phoneCell(tr, row) {
   const td = document.createElement('td'); td.className = 'contact-cell';
   const val = document.createElement('span'); val.textContent = row.telefone || '—'; td.append(val);
   // Somente números com formato de celular brasileiro recebem botão; não há verificação de cadastro.
-  for (const mobile of mobileCandidates(row.telefone)) {
-    const title = `Abrir WhatsApp para ${mobile.slice(2)} (cadastro não verificado)`;
-    const link = actionLink(td, '', `https://wa.me/${mobile}`, title, 'whatsapp-icon');
+  for (const candidate of mobileCandidatesDetailed(row.telefone)) {
+    const mobile = candidate.number;
+    const title = candidate.adjusted
+      ? `Possível celular antigo: nono dígito acrescentado conforme regra Anatel. Abrir WhatsApp para ${mobile.slice(2)} (número e conta não verificados)`
+      : `Abrir WhatsApp para ${mobile.slice(2)} (cadastro não verificado)`;
+    const link = actionLink(td, '', `https://wa.me/${mobile}`, title, candidate.adjusted ? 'whatsapp-icon whatsapp-legacy' : 'whatsapp-icon');
     link.append(whatsappGlyph());
   }
   tr.append(td);
@@ -113,7 +165,9 @@ function render() {
   }
   $('summary').textContent = `${list.length} após filtros · ${rows.length} registros carregados · página visual ${tablePage}/${pageCount}`;
   const status = state.requested ? `${rows.length} de ${state.requested} solicitados` : `${rows.length} registros`;
-  $('page-info').textContent = page ? `${status}; ${page} página(s) da API. ${state.partialError ? 'Falha parcial: exportação completa bloqueada.' : cursor ? 'Existem outros registros na fonte; o lote solicitado foi concluído quando atingiu o limite.' : 'Não há mais páginas indicadas.'}` : 'Nenhuma pesquisa iniciada.';
+  $('page-info').textContent = multiCnaeActive
+    ? `${status}; ${page} página(s) da API em ${selectedCnaes.length} CNAE(s). ${state.partialError ? 'Consulta parcial: exportação bloqueada.' : 'Limite por CNAE aplicado; outros resultados podem existir na fonte.'}`
+    : page ? `${status}; ${page} página(s) da API. ${state.partialError ? 'Falha parcial: exportação completa bloqueada.' : cursor ? 'Existem outros registros na fonte; o lote solicitado foi concluído quando atingiu o limite.' : 'Não há mais páginas indicadas.'}` : 'Nenhuma pesquisa iniciada.';
   $('prev-table').disabled = tablePage <= 1;
   $('next-table').disabled = tablePage >= pageCount;
   $('table-page').textContent = `Página ${tablePage} de ${pageCount}`;
@@ -124,7 +178,7 @@ function render() {
 }
 async function run(path, more) {
   if (state.busy) return;
-  if (!more) { rows = []; cursor = null; page = 0; tablePage = 1; state.complete = false; state.partialError = false; }
+  if (!more) { rows = []; cursor = null; page = 0; tablePage = 1; multiCnaeActive = false; state.complete = false; state.partialError = false; }
   state.busy = true;
   $('form-search').querySelector('button[type="submit"]').disabled = true;
   $('form-cnpj').querySelector('button[type="submit"]').disabled = true;
@@ -177,12 +231,110 @@ async function run(path, more) {
     render();
   }
 }
+
+async function runMultipleCnaes(cnaes, data) {
+  if (state.busy) return;
+  controller?.abort();
+  controller = new AbortController();
+  const signal = controller.signal;
+  const uf = String(data.get('uf') || ''), source = String(data.get('source') || 'minhareceita');
+  const perCnae = Number(data.get('limit'));
+  if (!['minhareceita'].includes(source) || !/^[A-Z]{2}$/.test(uf) ||
+      !Number.isInteger(perCnae) || perCnae < 1 || perCnae > 200 ||
+      cnaes.length < 2 || cnaes.length > MAX_CNAES) {
+    message('Parâmetros de pesquisa inválidos. Revise os CNAEs e o limite.', 'error');
+    return;
+  }
+  rows = []; cursor = null; page = 0; tablePage = 1; query = null;
+  multiCnaeActive = true;
+  state.busy = true; state.complete = false; state.partialError = false;
+  state.requested = cnaes.length * perCnae;
+  const seenCompanies = new Set();
+  const submitSearch = $('form-search').querySelector('button[type="submit"]');
+  const submitCnpj = $('form-cnpj').querySelector('button[type="submit"]');
+  submitSearch.disabled = true; submitCnpj.disabled = true;
+  $('cnae-add').disabled = true; $('cnae-input').disabled = true;
+  render();
+  try {
+    for (const [index, cnae] of cnaes.entries()) {
+      let receivedForCnae = 0, pagesForCnae = 0, nextCursor = null;
+      const usedCursors = new Set();
+      message(`Consultando CNAE ${cnae} (${index + 1}/${cnaes.length})... ${rows.length} empresas distintas.`);
+      do {
+        if (signal.aborted) throw Object.assign(new Error('Cancelado'), {name:'AbortError'});
+        if (pagesForCnae >= 10) throw new Error('O CNAE ' + cnae + ' excedeu o limite de 10 páginas.');
+        const params = new URLSearchParams({
+          uf, cnae, source, limit: String(Math.min(200, perCnae - receivedForCnae))
+        });
+        if (nextCursor) params.set('cursor', nextCursor);
+        const response = await apiFetch('/api/search?' + params, {signal, headers: {Accept:'application/json'}});
+        let result;
+        try { result = await response.json(); }
+        catch { throw new Error('Resposta HTTP ' + response.status + ' não contém JSON válido.'); }
+        if (!response.ok) throw new Error(`CNAE ${cnae}: ${result?.message || result?.error || 'HTTP ' + response.status}`);
+        if (!Array.isArray(result.data)) throw new Error('CNAE ' + cnae + ': resposta sem lista de empresas.');
+        const remaining = perCnae - receivedForCnae;
+        const chunk = result.data.slice(0, remaining);
+        const previousCount = receivedForCnae;
+        for (const item of chunk) {
+          if (!item || typeof item.cnpj !== 'string' || !/^\d{14}$/.test(item.cnpj)) continue;
+          if (!seenCompanies.has(item.cnpj)) {
+            seenCompanies.add(item.cnpj);
+            rows.push(item);
+          }
+        }
+        receivedForCnae += chunk.length;
+        page++; pagesForCnae++;
+        const returnedCursor = typeof result.cursor === 'string' && result.cursor ? result.cursor : null;
+        if (!returnedCursor || receivedForCnae >= perCnae) {
+          nextCursor = null; break;
+        }
+        if (!chunk.length || receivedForCnae === previousCount ||
+            returnedCursor === nextCursor || usedCursors.has(returnedCursor)) {
+          throw new Error('Paginação repetida ou sem novos registros para CNAE ' + cnae);
+        }
+        usedCursors.add(returnedCursor);
+        nextCursor = returnedCursor;
+        render();
+      } while (nextCursor);
+      render();
+    }
+    state.complete = true;
+    message(`Pesquisa concluída: ${cnaes.length} CNAEs consultados, ${rows.length} CNPJs distintos carregados. A exportação inclui somente os registros recebidos.`, 'ok');
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      state.partialError = true; // Nunca liberar exportação de uma pesquisa multi-CNAE incompleta.
+      message('Pesquisa interrompida: ' + error.message + '. Resultados parciais mantidos somente na tela, sem exportação.', 'error');
+    }
+  } finally {
+    state.busy = false;
+    $('cnae-add').disabled = false; $('cnae-input').disabled = false;
+    submitSearch.disabled = !loggedIn();
+    submitCnpj.disabled = !loggedIn();
+    render();
+  }
+}
+
 $('tab-search').addEventListener('click', () => switchMode('search'));
 $('tab-cnpj').addEventListener('click', () => switchMode('cnpj'));
 $('form-search').addEventListener('submit', e => {
-  e.preventDefault(); const data = new FormData(e.currentTarget);
-  query = new URLSearchParams({ uf: data.get('uf'), cnae: data.get('cnae'), limit: data.get('limit'),source:data.get('source') });
-  run('/api/search?' + query, false);
+  e.preventDefault();
+  if (state.busy) return;
+  if ($('cnae-input').value.trim() && !addTypedCnaes()) {
+    message('Revise o CNAE informado antes de pesquisar.', 'error');
+    return;
+  }
+  if (!selectedCnaes.length) {
+    $('cnae-feedback').textContent = 'Adicione ao menos um CNAE para pesquisar.';
+    return;
+  }
+  const data = new FormData(e.currentTarget);
+  if (selectedCnaes.length === 1) {
+    query = new URLSearchParams({ uf: data.get('uf'), cnae: selectedCnaes[0], limit: data.get('limit'), source: data.get('source') });
+    run('/api/search?' + query, false);
+  } else {
+    runMultipleCnaes([...selectedCnaes], data);
+  }
 });
 $('form-cnpj').addEventListener('submit', e => {
   e.preventDefault(); const data = new FormData(e.currentTarget);

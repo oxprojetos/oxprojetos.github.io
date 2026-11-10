@@ -1,14 +1,28 @@
-// Indicação de candidatos móveis. NÃO verifica cadastro no WhatsApp.
-export function mobileCandidates(value) {
+// Candidatos para abrir WhatsApp. NÃO verifica a existência da conta.
+// Números antigos com DDD + 8 dígitos iniciando em 9 são ajustados conforme
+// a regra histórica do nono dígito da Anatel. A conta pode não existir.
+export function mobileCandidatesDetailed(value) {
   const phones = String(value ?? '').split(/\s*\/\s*|\s*;\s*|\s*,\s*/);
-  const numbers = new Set();
+  const candidates = new Map();
   for (const raw of phones) {
     let number = raw.replace(/\D/g, '');
-    if (number.startsWith('55') && number.length === 13) number = number.slice(2);
-    // DDD com 2 dígitos + telefone celular brasileiro com 9 dígitos iniciados em 9.
-    if (/^[1-9][0-9]9[0-9]{8}$/.test(number)) numbers.add(`55${number}`);
+    if (number.startsWith('55') && (number.length === 12 || number.length === 13)) number = number.slice(2);
+    let adjusted = false;
+    if (/^[1-9][0-9]9[0-9]{7}$/.test(number)) {
+      // Ex.: 91 9131-9773 -> 91 9 9131-9773; jamais alterar o número exibido na tabela.
+      number = number.slice(0, 2) + '9' + number.slice(2);
+      adjusted = true;
+    }
+    if (/^[1-9][0-9]9[0-9]{8}$/.test(number)) {
+      const international = '55' + number;
+      if (!candidates.has(international)) candidates.set(international, { number: international, adjusted });
+      else if (!adjusted) candidates.set(international, { number: international, adjusted: false });
+    }
   }
-  return [...numbers];
+  return [...candidates.values()];
+}
+export function mobileCandidates(value) {
+  return mobileCandidatesDetailed(value).map(candidate => candidate.number);
 }
 export function emailAddress(value) {
   const v = String(value ?? '').trim();

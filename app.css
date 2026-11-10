@@ -252,3 +252,47 @@ body.pro-authenticated #auth-panel{display:none!important}
   .contact-cell .whatsapp-icon{width:44px;height:44px;min-width:44px;min-height:44px}
 }
 @media(prefers-reduced-motion:reduce){.contact-cell .whatsapp-icon{transition:none}}
+
+
+/* Múltiplos CNAEs: escrita livre do código, seleção por chips e revisão antes da pesquisa. */
+.cnae-selector{display:grid;gap:9px;min-width:0}
+.cnae-selector>label{min-width:0;display:grid;gap:6px}
+.cnae-selector input{width:100%;min-width:0}
+.cnae-count{float:right;color:#1d7099;font-weight:800;font-size:10px}
+.cnae-add{display:inline-flex;align-items:center;justify-content:center;
+ min-height:38px;width:100%;background:#edf6fb!important;color:#185c81!important;
+ border:1px solid #c7deea!important;border-radius:9px;font-size:11px!important;font-weight:800}
+.cnae-add:hover{background:#def0fa!important}
+.cnae-add:disabled{opacity:.5;cursor:not-allowed}
+.cnae-chips{display:flex;align-items:flex-start;flex-wrap:wrap;gap:7px}
+.cnae-chip{display:inline-flex;max-width:100%;align-items:center;gap:6px;
+ background:#e8f3fc;border:1px solid #b9d9ef;border-radius:11px;padding:5px 6px 5px 9px;
+ color:#174f72;font-size:10px;line-height:1.45;font-weight:750}
+.cnae-chip>span{min-width:0;overflow-wrap:anywhere}
+.cnae-chip>button{border:0;background:#d2e9f8;color:#1c5b83;font-size:17px;
+ border-radius:7px;width:30px;height:30px;min-width:30px;min-height:30px;padding:0;line-height:1}
+.cnae-chip>button:hover{background:#b6d9ef}
+.cnae-chip>button:focus-visible,.cnae-add:focus-visible{
+ outline:3px solid #2686be;outline-offset:2px}
+.cnae-hint{color:#61788b;font-size:10px;line-height:1.6}
+.cnae-feedback{color:#a32c2c;font-size:11px;font-weight:700;min-height:0}
+.cnae-feedback:empty{display:none}
+
+/* Visual warning on a candidate mobile number adjusted from legacy 8 digits. */
+.contact-cell .whatsapp-legacy{position:relative;background:#117f4a}
+.contact-cell .whatsapp-legacy::after{
+ content:'9+';position:absolute;right:-5px;top:-6px;min-width:18px;height:18px;
+ display:grid;place-items:center;background:#fff6d8;color:#865a00;
+ font-size:9px;font-weight:900;border:1px solid #c7a552;border-radius:999px;
+}
+@media(max-width:600px){
+ .cnae-chip>button{min-width:38px;min-height:38px}
+ .cnae-add{min-height:44px}
+ .cnae-selector{gap:10px}
+}
+
+
+/* Prevent a sticky results action bar from covering company rows and taps. */
+.pro-results-card .results-head{
+  position:relative!important;top:auto!important;z-index:auto!important;
+}
