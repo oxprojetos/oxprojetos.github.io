@@ -109,7 +109,7 @@ function phoneCell(tr, row) {
   const td = document.createElement('td');
   td.className = 'contact-cell';
   const text = String(row.telefone ?? '').trim();
-  const parts = text ? text.split(/\s*\/\s*|\s*;\s*|\s*,\s*/).map(s => s.trim()).filter(Boolean) : [];
+  const parts = text ? text.split(/[\r\n]+|\s*\/\s*|\s*;\s*|\s*,\s*/).map(s => s.trim()).filter(Boolean) : [];
   const displayed = parts.length ? parts : ['—'];
   const unique = new Set();
   for (const rawPhone of displayed) {
