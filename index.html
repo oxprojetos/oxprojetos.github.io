@@ -6,8 +6,10 @@
   <meta name="robots" content="noindex,nofollow">
   <title>OX Pesquisa Pro | Inteligência Empresarial v0.4</title>
   <link rel="stylesheet" href="./app.css">
+  <link rel="stylesheet" href="./cnae-autocomplete.css">
   <script src="./config.js"></script>
   <script type="module" src="./app.js"></script>
+  <script type="module" src="./cnae-autocomplete.mjs"></script>
   <script defer src="./pro-ui.js"></script>
 </head>
 <body class="pro-locked">
@@ -41,19 +43,15 @@
           <option value="PA">Pará</option><option value="MA">Maranhão</option><option value="AP">Amapá</option><option value="TO">Tocantins</option><option value="PI">Piauí</option><option value="CE">Ceará</option><option value="AM">Amazonas</option><option value="RR">Roraima</option><option value="RO">Rondônia</option><option value="AC">Acre</option><option value="SP">São Paulo</option><option value="RJ">Rio de Janeiro</option><option value="MG">Minas Gerais</option><option value="BA">Bahia</option><option value="PR">Paraná</option><option value="RS">Rio Grande do Sul</option><option value="SC">Santa Catarina</option><option value="ES">Espírito Santo</option><option value="PE">Pernambuco</option><option value="PB">Paraíba</option><option value="RN">Rio Grande do Norte</option><option value="AL">Alagoas</option><option value="SE">Sergipe</option><option value="DF">Distrito Federal</option><option value="MS">Mato Grosso do Sul</option><option value="MT">Mato Grosso</option><option value="GO">Goiás</option>
         </select></label>
         <div class="cnae-selector">
-          <label for="cnae-input">Atividades / CNAEs <span class="cnae-count" id="cnae-count">1/5</span>
-            <input id="cnae-input" type="text" inputmode="text" list="cnae-suggestions" maxlength="100" placeholder="Digite o CNAE, ex.: 4731800" autocomplete="off" aria-describedby="cnae-hint">
-          </label>
-          <datalist id="cnae-suggestions">
-            <option value="4731800" label="Postos de combustíveis"></option>
-            <option value="4930202" label="Transporte intermunicipal e interestadual"></option>
-            <option value="4930201" label="Transporte municipal"></option>
-            <option value="4930203" label="Transporte de produtos perigosos"></option>
-            <option value="4732600" label="Comércio de lubrificantes"></option>
-          </datalist>
+          <label for="cnae-input">CNAE / Atividade econômica <span class="cnae-count" id="cnae-count">1/5</span></label>
+          <div class="cnae-combobox">
+            <input id="cnae-input" type="text" inputmode="search" maxlength="100" placeholder="Código ou nome, ex.: posto, transporte, 4731" autocomplete="off" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-controls="cnae-options" aria-expanded="false" aria-describedby="cnae-hint cnae-suggestions-status">
+            <div id="cnae-options" class="cnae-options" role="listbox" aria-label="Sugestões oficiais de CNAE" hidden></div>
+            <span id="cnae-suggestions-status" class="cnae-suggestions-status" role="status" aria-live="polite"></span>
+          </div>
           <button type="button" id="cnae-add" class="cnae-add">+ Adicionar CNAE</button>
           <div id="cnae-chips" class="cnae-chips" role="group" aria-label="CNAEs selecionados"></div>
-          <small id="cnae-hint" class="cnae-hint">Digite qualquer código CNAE válido de 7 dígitos. Pode colar vários separados por vírgula ou ponto e vírgula. Até 5 CNAEs, consultados separadamente, com resultados reunidos.</small>
+          <small id="cnae-hint" class="cnae-hint">Digite o código ou o nome da atividade. Escolha uma sugestão da lista oficial do IBGE; também pode colar vários códigos separados por vírgula. Até 5 CNAEs por pesquisa, consultados separadamente.</small>
           <span id="cnae-feedback" class="cnae-feedback" role="status" aria-live="polite"></span>
         </div>
         <label>Resultados por CNAE <select name="limit"><option>20</option><option>50</option><option>100</option><option selected>200</option></select></label>
