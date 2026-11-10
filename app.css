@@ -183,3 +183,35 @@ body.pro-authenticated #auth-panel{display:none!important}
   .pro-search-card .fields button{grid-column:1/-1!important}
   .pro-workspace-grid>.kpis,.pro-workspace-grid>.pro-results-card,.pro-workspace-grid>.extra-tools{grid-column:1;grid-row:auto}
 }
+
+
+/* Accessibility and real touch targets: v0.4 Pro pre-publication review. */
+.pro-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.pro-details-open{
+  display:inline-flex;align-items:center;justify-content:flex-start;
+  min-width:116px;min-height:44px;width:100%;max-width:100%;padding:8px 6px;
+  text-align:left;background:transparent;border:1px solid transparent;border-radius:7px;
+  color:#175b89;font:inherit;font-weight:800;line-height:1.5;white-space:normal;
+  cursor:pointer;touch-action:manipulation;overflow-wrap:anywhere
+}
+.pro-details-open:hover{background:#eaf5fd;border-color:#c5ddeb}
+.pro-detail-backdrop{touch-action:manipulation}
+.pro-detail-panel{overscroll-behavior:contain}
+.pro-detail-panel>button:first-child{min-width:44px;min-height:44px;border-radius:9px;font-size:16px;touch-action:manipulation}
+.pro-results-card .table-container{overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+.pro-nav-button,#pro-top-logout,#pro-menu-toggle,.pro-column-toggle{min-height:44px;touch-action:manipulation}
+.pro-nav-button:focus-visible,.pro-details-open:focus-visible,.pro-detail-panel button:focus-visible,
+.pro-topbar button:focus-visible,.pro-column-toggle:focus-visible,.pro-column-menu input:focus-visible,
+.pro-search-card button:focus-visible,.pro-results-card button:focus-visible,
+.pro-login-card button:focus-visible,.pro-login-card input:focus-visible,
+.pro-search-card input:focus-visible,.pro-search-card select:focus-visible{
+  outline:3px solid #38a2d4;outline-offset:3px;
+}
+.pro-intro p,.pro-filters-heading p,.pro-results-card .export-hint,.pro-results-card td{color:#52677b}
+.pro-login-foot{color:#c0d8e8}.pro-login-copy p{color:#d4e8f6}
+.pro-detail-panel .pro-detail-caption{color:#4a647c}
+@media(max-width:600px){
+ .pro-column-toggle{min-height:44px}
+ .pro-results-card .table-container{scrollbar-width:thin}
+ .pro-detail-panel{padding:21px 18px 30px}
+}
