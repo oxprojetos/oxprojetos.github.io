@@ -20,11 +20,15 @@ O PR #2 contém exclusivamente adaptação visual do site OX Pesquisa existente.
 - [x] Marcados `scope=col`, legenda acessível na tabela, `aria-controls` e `aria-expanded` nos controles relevantes.
 - [x] Indicadores de foco e cores de texto ajustados, com opção de movimento reduzido mantida.
 - [x] Filtros em layout empilhado no tablet, rolagem horizontal restrita à tabela, sem transbordamento do documento.
+- [x] Respeitada a classe original `.hide`: somente um formulário por vez entre busca por UF/CNAE e consulta individual por CNPJ, inclusive em telas pequenas.
+- [x] Cabeçalho de resultados e ações de exportação ficam visíveis abaixo da barra superior fixa em desktop e tablet.
+
 
 ## 3. Evidências no CI próprio da VPS srv1866007
 **Laboratório P0 com `unshare --net` e dados fictícios. Nenhuma requisição externa real.**
 
 - [x] QA de regressão v0.4: **96 verificações aprovadas**, Chrome desktop 1440×900, tablet 820×1050 e celular 390×844.
+- [x] Incluídas asserções de `getComputedStyle().display` para validar exclusividade dos formulários em cada aba; ambas as trocas foram aprovadas.
 - [x] Login/logout simulados, recuperação, pesquisa por CNPJ, pesquisa por UF/CNAE, filtros, seleção de colunas e downloads CSV/XLS/XLSX testados.
 - [x] QA específica de toque e acessibilidade: **242 verificações aprovadas** em 320×700, 390×844, 768×1024, 820×1050, 1024×820 e 1440×900.
 - [x] Teste de `touchscreen.tap` (toque efetivo em coordenadas de dispositivo, não `element.click()`) em cinco larguras móveis/tablet.
