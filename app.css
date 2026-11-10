@@ -290,3 +290,9 @@ body.pro-authenticated #auth-panel{display:none!important}
  .cnae-add{min-height:44px}
  .cnae-selector{gap:10px}
 }
+
+
+/* Prevent a sticky results action bar from covering company rows and taps. */
+.pro-results-card .results-head{
+  position:relative!important;top:auto!important;z-index:auto!important;
+}
