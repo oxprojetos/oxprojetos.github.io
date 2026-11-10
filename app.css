@@ -215,3 +215,7 @@ body.pro-authenticated #auth-panel{display:none!important}
  .pro-results-card .table-container{scrollbar-width:thin}
  .pro-detail-panel{padding:21px 18px 30px}
 }
+
+
+/* Original v0.4 tab semantics take precedence over the Pro grid styling. */
+.pro-search-card .fields.hide{display:none!important}
