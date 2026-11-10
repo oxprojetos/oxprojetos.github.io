@@ -4,7 +4,7 @@ import { CNAE_CATALOG } from './cnae-catalog.mjs';
 export const CATALOG_SIZE = CNAE_CATALOG.length;
 const fold = text => String(text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
 const aliasMap = new Map([
- ['4731800', ['posto', 'postos', 'posto de combustiveis', 'gasolina', 'diesel']],
+ ['4731800', ['posto', 'postos', 'posto de combustiveis', 'combustivel', 'combustiveis', 'gasolina', 'diesel']],
  ['4930201', ['transportadora', 'transporte de carga municipal']],
  ['4930202', ['transportadora', 'transporte de carga intermunicipal']],
  ['4930203', ['transportadora', 'carga perigosa']],
