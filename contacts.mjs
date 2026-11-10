@@ -2,7 +2,7 @@
 // Números antigos com DDD + 8 dígitos iniciando em 9 são ajustados conforme
 // a regra histórica do nono dígito da Anatel. A conta pode não existir.
 export function mobileCandidatesDetailed(value) {
-  const phones = String(value ?? '').split(/\s*\/\s*|\s*;\s*|\s*,\s*/);
+  const phones = String(value ?? '').split(/[\r\n]+|\s*\/\s*|\s*;\s*|\s*,\s*/);
   const candidates = new Map();
   for (const raw of phones) {
     let number = raw.replace(/\D/g, '');
