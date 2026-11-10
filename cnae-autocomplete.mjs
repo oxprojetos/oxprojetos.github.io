@@ -46,6 +46,22 @@ export function setupCnaeAutocomplete(doc = document) {
   const status = doc.getElementById('cnae-suggestions-status');
   if (!input || !list || !add || !status) return false;
   let results = [], active = -1;
+  const officialDescriptions = new Map(CNAE_CATALOG);
+  const chips = doc.getElementById('cnae-chips');
+  // Existing app.js owns the chip lifecycle. Decorate only its text after each render.
+  const labelSelectedChips = () => {
+    for (const chip of chips.querySelectorAll('.cnae-chip')) {
+      const span = chip.querySelector('span');
+      const code = span?.textContent.match(/^\s*(\d{7})/)?.[1];
+      const description = officialDescriptions.get(code);
+      if (span && description) {
+        const label = code + ' · ' + description;
+        if (span.textContent !== label) span.textContent = label;
+      }
+    }
+  };
+  new doc.defaultView.MutationObserver(labelSelectedChips).observe(chips,{childList:true});
+  labelSelectedChips();
   const selectedCodes = () => [...doc.querySelectorAll('#cnae-chips .cnae-chip')]
     .map(el=>el.textContent.match(/^\s*(\d{7})/)?.[1]).filter(Boolean);
   const close = () => {
