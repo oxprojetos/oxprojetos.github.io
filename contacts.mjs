@@ -1,10 +1,22 @@
 // Candidatos para abrir WhatsApp. NÃO verifica a existência da conta.
 // Números antigos com DDD + 8 dígitos iniciando em 9 são ajustados conforme
 // a regra histórica do nono dígito da Anatel. A conta pode não existir.
+// Preserva o telefone bruto: valida somente o candidato para ações.
+export function isUsablePhone(raw) {
+  let digits = String(raw ?? '').replace(/\D/g, '');
+  if(digits.startsWith('55') && [12,13].includes(digits.length)) digits = digits.slice(2);
+  if(!/^[1-9][0-9][2-9][0-9]{7,8}$/.test(digits)) return false;
+  if(/^([0-9])\1+$/.test(digits)) return false;
+  return true;
+}
+export function hasUsablePhone(value) {
+  return String(value ?? '').split(/[\r\n]+|\s*\/\s*|\s*;\s*|\s*,\s*/).some(isUsablePhone);
+}
 export function mobileCandidatesDetailed(value) {
   const phones = String(value ?? '').split(/[\r\n]+|\s*\/\s*|\s*;\s*|\s*,\s*/);
   const candidates = new Map();
   for (const raw of phones) {
+    if(!isUsablePhone(raw)) continue;
     let number = raw.replace(/\D/g, '');
     if (number.startsWith('55') && (number.length === 12 || number.length === 13)) number = number.slice(2);
     let adjusted = false;
