@@ -12,6 +12,18 @@ export const EXPORT_COLUMNS = [
 function safeText(value) {
   return String(value ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '').slice(0, 32767);
 }
+// EX-EXPORT-04: only a valid monetary amount becomes numeric in Excel.
+export function parseCapitalSocial(value) {
+  if(value === null || value === undefined || value === '') return null;
+  let raw = typeof value === 'number' ? String(value) : String(value).trim().replace(/^R\$\s*/i,'').replace(/[\s\u00a0]/g,'');
+  if(/^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/.test(raw)) raw = raw.replace(/\./g,'').replace(',','.');
+  else if(/^\d{1,3}(?:,\d{3})+\.\d{1,2}$/.test(raw)) raw = raw.replace(/,/g,'');
+  else if(/^\d{1,12}(?:[.,]\d{1,2})?$/.test(raw)) raw = raw.replace(',','.');
+  else return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 && n < 1e12 && Math.abs(n * 100 - Math.round(n * 100)) < 1e-5 ? n : null;
+}
+const CAPITAL_COL = EXPORT_COLUMNS.findIndex(([field]) => field === 'capital_social');
 export function exportMatrix(rows) {
   return [EXPORT_COLUMNS.map(([, title]) => title), ...rows.map(row => EXPORT_COLUMNS.map(([field]) => safeText(row[field])))];
 }
@@ -66,7 +78,12 @@ function xml(s) {
 function colName(index) { let x = index + 1, s = ''; while (x) { x--; s = String.fromCharCode(65 + (x % 26)) + s; x = Math.floor(x / 26); } return s; }
 export function toXlsx(rows) {
   const matrix = exportMatrix(rows), columns = matrix[0].length;
-  const sheetRows = matrix.map((r, ri) => `<row r="${ri + 1}">${r.map((v, ci) => `<c r="${colName(ci)}${ri + 1}" t="inlineStr"${ri === 0 ? ' s="1"' : ''}><is><t xml:space="preserve">${xml(v)}</t></is></c>`).join('')}</row>`).join('');
+  const sheetRows = matrix.map((r, ri) => `<row r="${ri + 1}">${r.map((v, ci) => {
+    const capital = ri > 0 && ci === CAPITAL_COL ? parseCapitalSocial(rows[ri - 1]?.capital_social) : null;
+    return capital === null
+      ? `<c r="${colName(ci)}${ri + 1}" t="inlineStr"${ri === 0 ? ' s="1"' : ''}><is><t xml:space="preserve">${xml(v)}</t></is></c>`
+      : `<c r="${colName(ci)}${ri + 1}" s="2" t="n"><v>${capital}</v></c>`;
+  }).join('')}</row>`).join('');
   const colWidths = matrix[0].map((_, i) => `<col min="${i + 1}" max="${i + 1}" width="${[19,36,30,20,8,27,30,15,15,22,18,30,30,30,30,30,30,30,22,23,20,24][i] ?? 20}" customWidth="1"/>`).join('');
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${colWidths}</cols><sheetData>${sheetRows}</sheetData><autoFilter ref="A1:${colName(columns - 1)}${matrix.length}"/></worksheet>`;
   return zipStored([
@@ -74,10 +91,11 @@ export function toXlsx(rows) {
     ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
     ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Empresas OX" sheetId="1" r:id="rId1"/></sheets></workbook>`],
     ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
-    ['xl/styles.xml', `<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF176EA3"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFill="1" applyFont="1"/></cellXfs></styleSheet>`],
+    ['xl/styles.xml', `<?xml version="1.0" encoding="UTF-8"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF176EA3"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFill="1" applyFont="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs></styleSheet>`],
     ['xl/worksheets/sheet1.xml', sheet]
   ]);
 }
+function double64(n) { const b=new Uint8Array(8); new DataView(b.buffer).setFloat64(0,n,true); return b; }
 function biffRecord(type, payload = new Uint8Array(0)) {
   const h = new Uint8Array(4), dv = new DataView(h.buffer);
   dv.setUint16(0, type, true); dv.setUint16(2, payload.length, true);
@@ -142,24 +160,31 @@ function makeOleWorkbook(stream) {
 export function toXls(rows) {
   const matrix = exportMatrix(rows), indices = new Map(), strings = [];
   let total = 0;
-  for (const row of matrix) for (const v of row) {
-    if (!v) continue; total++;
+  for (let r=0; r<matrix.length; r++) for(let c=0; c<matrix[r].length; c++) {
+    const v=matrix[r][c];
+    if (!v || (r > 0 && c === CAPITAL_COL && parseCapitalSocial(rows[r - 1]?.capital_social) !== null)) continue;
+    total++;
     if (!indices.has(v)) { indices.set(v, strings.length); strings.push(v); }
   }
   const dim = concat([U32(0), U32(matrix.length), U16(0), U16(matrix[0].length), U16(0)]);
   const cells = [bof(0x0010), biffRecord(0x0200, dim)];
   for (let r = 0; r < matrix.length; r++) for (let c = 0; c < matrix[r].length; c++) {
     const text = matrix[r][c]; if (!text) continue;
-    cells.push(biffRecord(0x00FD, concat([U16(r), U16(c), U16(0), U32(indices.get(text))])));
+    const capital = r > 0 && c === CAPITAL_COL ? parseCapitalSocial(rows[r - 1]?.capital_social) : null;
+    if(capital !== null) cells.push(biffRecord(0x0203,concat([U16(r),U16(c),U16(1),double64(capital)])));
+    else cells.push(biffRecord(0x00FD, concat([U16(r), U16(c), U16(0), U32(indices.get(text))])));
   }
   cells.push(biffRecord(0x000A));
   const sheet = concat(cells);
   const codepage = biffRecord(0x0042, U16(1200));
   const xf = biffRecord(0x00E0, new Uint8Array(20));
+  const currencyXfPayload = new Uint8Array(20);
+  new DataView(currencyXfPayload.buffer).setUint16(2,4,true); // Excel builtin #,##0.00
+  const moneyXf = biffRecord(0x00E0, currencyXfPayload);
   const sst = sstRecords(strings, total);
   const sheetName = 'Empresas OX';
   const bound = offset => biffRecord(0x0085, concat([U32(offset), Uint8Array.of(0, 0, sheetName.length, 1), utf16le(sheetName)]));
-  const global = offset => concat([bof(0x0005), codepage, xf, ...sst, bound(offset), biffRecord(0x000A)]);
+  const global = offset => concat([bof(0x0005), codepage, xf, moneyXf, ...sst, bound(offset), biffRecord(0x000A)]);
   const first = global(0);
   return makeOleWorkbook(concat([global(first.length), sheet]));
 }
