@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,existsSync,mkdirSync,readdirSync} from 'node:fs';
 import {join} from 'node:path';
 import puppeteer from '/home/oxrunner/ox-pesquisa-ci-p0/runtime/browser/node_modules/puppeteer-core/lib/puppeteer/puppeteer-core.js';
-const ROOT=new URL('..', import.meta.url).pathname.replace(/\/$/,'');
+const ROOT=new URL('..',import.meta.url).pathname.replace(/\/$/,'');
 const SITE=ROOT,QA=join(ROOT,'qa'),ORIGIN='https://oxprojetos.github.io';
 const data=Array.from({length:20},(_,i)=>({
  cnpj: String(1000000000000+i).padStart(14,'0'),razao_social:'EMPRESA FICTÍCIA '+i,
@@ -79,6 +79,13 @@ async function visit(label,w,h,touch){
   await page.click('#export');
   check(await page.$eval('#feedback',e=>e.textContent.includes('20 registros carregados')),'CSV all even if only active visible');
   check((await page.evaluate(()=>document.querySelectorAll('#records tr').length))===7,'screen still filtered');
+  await page.select('#export-scope','filtered');
+  await page.type('#city-filter','Belem');
+  check(await page.$eval('#export-count',e=>e.textContent.includes('3 registro(s)')),'accent-insensitive city filter: Belem=Belém');
+  check((await page.evaluate(()=>document.querySelectorAll('#records tr').length))===3,'city narrows active list');
+  await page.select('#export-scope','all');
+  check(await page.$eval('#export-count',e=>e.textContent.includes('20 registro(s)')),'all ignores city filter intentionally');
+  await page.$eval('#city-filter',el=>{el.value='';el.dispatchEvent(new Event('input',{bubbles:true}));});
   await page.select('#export-scope','filtered');
   await page.type('#filter','NÃO-EXISTE');
   check(await page.$eval('#export',e=>e.disabled),'filtered zero rows disabled');
