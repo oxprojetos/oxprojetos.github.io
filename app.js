@@ -69,15 +69,20 @@ function message(msg, type = '') { $('feedback').textContent = msg; $('feedback'
 function reset() {
   rows = []; cursor = null; page = 0; query = null; tablePage = 1; multiCnaeActive = false;
   state.requested = 0; state.complete = false; state.partialError = false;
-  $('filter').value = ''; message('Pronto para iniciar uma nova consulta.'); render();
+  $('filter').value = ''; $('city-filter').value = ''; message('Pronto para iniciar uma nova consulta.'); render();
+}
+function normalizedFilter(value) {
+  return String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
 }
 function filtered() {
-  const q = $('filter').value.trim().toLocaleLowerCase('pt-BR');
+  const q = normalizedFilter($('filter').value.trim());
+  const city = normalizedFilter($('city-filter').value.trim());
   return rows.filter(r => {
+    if (city && !normalizedFilter(r.municipio).includes(city)) return false;
     if ($('active').checked && r.situacao !== 'ATIVA') return false;
     if ($('contact').checked && !hasUsablePhone(r.telefone) && !emailAddress(r.email)) return false;
     if (!q) return true;
-    return [r.cnpj,r.razao_social,r.nome_fantasia,r.municipio,r.uf,r.telefone,r.email,r.website].join(' ').toLocaleLowerCase('pt-BR').includes(q);
+    return normalizedFilter([r.cnpj,r.razao_social,r.nome_fantasia,r.municipio,r.uf,r.telefone,r.email,r.website].join(' ')).includes(q);
   });
 }
 function textCell(tr, value) {
@@ -369,7 +374,7 @@ $('more').addEventListener('click', () => {
   const next = new URLSearchParams(query); next.set('cursor', cursor);
   run('/api/search?' + next, true);
 });
-for (const id of ['filter', 'active', 'contact']) $(id).addEventListener(id === 'filter' ? 'input' : 'change', () => { tablePage = 1; render(); });
+for (const id of ['filter', 'city-filter', 'active', 'contact']) $(id).addEventListener(['filter', 'city-filter'].includes(id) ? 'input' : 'change', () => { tablePage = 1; render(); });
 $('export-scope').addEventListener('change', render);
 $('per-page').addEventListener('change', () => { tablePage = 1; render(); });
 $('prev-table').addEventListener('click', () => { tablePage--; render(); });
