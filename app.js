@@ -448,18 +448,89 @@ $('apply-enrich').addEventListener('click',()=>{
   item.fonte_site='website_public_links';item.consultado_site_em=latestEnrichment.coletado_em;
   render();message(`Links adicionados apenas à tabela local para ${target}. Nenhum banco de dados foi modificado.`, 'ok');
 });
-$('form-places').addEventListener('submit',async e=>{
-  e.preventDefault();const d=new FormData(e.currentTarget);const box=$('places-result');box.textContent='Consultando Google Places...';
+$('form-social-links').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const box=$('social-links-result');
+  const values=String(new FormData(e.currentTarget).get('links')??'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  if(!values.length||values.length>8){box.textContent='Informe de 1 a 8 links, cada um em uma linha.';return;}
+  const params=new URLSearchParams();
+  for(const value of values)params.append('url',value);
+  if(params.toString().length>1250){box.textContent='Links muito longos. Reduza a lista.';return;}
+  box.textContent='Validando apenas o formato dos links informados...';
   try{
-    const res=await apiFetch('/api/places/search?'+new URLSearchParams({q:d.get('q'),limit:d.get('limit')}));const out=await res.json();
+    const res=await apiFetch('/api/social/validate?'+params);
+    const out=await res.json();
     if(!res.ok)throw new Error(out.message||out.error||`HTTP ${res.status}`);
+    if(!Array.isArray(out.data)||out.source!=='provided_links_only')throw new Error('Resposta inválida do validador.');
     box.replaceChildren();
-    const note=document.createElement('p');note.textContent=`${out.count} locais encontrados. Fonte: Google Maps. Consulta temporária, não associada a CNPJ e sem exportação.`;box.append(note);
-    for(const p of out.data){const line=document.createElement('p');line.textContent=`${p.nome} | ${p.endereco} `;
-      if(p.mapa){const a=document.createElement('a');a.textContent='Abrir no Google Maps';a.href=p.mapa;a.rel='noopener noreferrer';a.target='_blank';line.append(a);}box.append(line);}
-    const attr=document.createElement('p');attr.textContent='Dados e atribuição: Google Maps';box.append(attr);
-  }catch(e){box.textContent='Google Places: '+e.message;}
+    const note=document.createElement('p');
+    note.textContent=`${out.accepted} link(s) aceito(s), ${out.rejected} rejeitado(s). Os links foram informados por você e não tiveram existência, titularidade ou CNPJ verificados.`;
+    box.append(note);
+    const links=document.createElement('div');
+    const platformLabels={instagram:'Instagram',facebook:'Facebook',linkedin:'LinkedIn',youtube:'YouTube',tiktok:'TikTok',x:'X'};
+    for(const item of out.data){
+      const type=String(item.platform||'');
+      const href=safeExternalUrl(item.url,type);
+      if(!href||!platformLabels[type])continue;
+      const a=document.createElement('a');a.textContent=platformLabels[type]+' · '+href;a.href=href;
+      a.target='_blank';a.rel='noopener noreferrer';a.className='social-link';links.append(a);
+    }
+    box.append(links);
+  }catch(error){box.textContent='Validação de links: '+error.message;}
 });
+
+let placesQuery=null,placesCursor=null,placesPages=0,placesCount=0,placesBusy=false;
+let placeIds=new Set();
+async function searchPlacesPage(append=false){
+  if(placesBusy||!loggedIn())return;
+  const box=$('places-result'),more=$('places-more'),form=$('form-places');
+  if(!append){
+    const data=new FormData(form);
+    placesQuery={q:String(data.get('q')??'').trim(),limit:String(data.get('limit')??'10')};
+    placesCursor=null;placesPages=0;placesCount=0;placeIds=new Set();box.replaceChildren();
+  }
+  if(!placesQuery||append&&!placesCursor||placesPages>=3||placesCount>=60)return;
+  placesBusy=true;more.disabled=true;more.hidden=true;
+  const request=new URLSearchParams(placesQuery);
+  if(append)request.set('cursor',placesCursor);
+  const priorCursor=placesCursor;
+  const info=document.createElement('p');info.textContent='Consultando fonte Google Places (somente quando habilitada no servidor)...';
+  box.append(info);
+  try{
+    const res=await apiFetch('/api/places/search?'+request);
+    const out=await res.json();
+    if(!res.ok)throw new Error(out.message||out.error||`HTTP ${res.status}`);
+    if(!Array.isArray(out.data)||out.source!=='google_places_official')throw new Error('Resposta Places inválida.');
+    info.remove();
+    for(const p of out.data){
+      if(!p||typeof p.id!=='string'||placeIds.has(p.id))continue;
+      placeIds.add(p.id);placesCount++;
+      const line=document.createElement('p');line.textContent=`${p.nome||'Local'} | ${p.endereco||'Endereço não informado'} `;
+      const href=safeExternalUrl(p.mapa);
+      if(href){
+        const host=new URL(href).hostname.toLowerCase();
+        if(['google.com','www.google.com','maps.google.com','maps.app.goo.gl'].includes(host)){
+          const a=document.createElement('a');a.textContent='Abrir no Google Maps';a.href=href;
+          a.rel='noopener noreferrer';a.target='_blank';line.append(a);
+        }
+      }
+      box.append(line);
+    }
+    placesPages++;
+    const next=typeof out.nextPageToken==='string'&&out.nextPageToken.length<=512?out.nextPageToken:null;
+    if(next&&next===priorCursor)throw new Error('Cursor Places repetido.');
+    placesCursor=next;
+    const note=document.createElement('p');note.textContent=`${placesCount} locais carregados em ${placesPages} página(s). Fonte: Google Maps. Dados transitórios, não vinculados a CNPJ e não exportados.`;
+    box.prepend(note);
+    more.hidden=!(placesCursor&&placesPages<3&&placesCount<60);
+  }catch(error){
+    info.remove();placesCursor=null;
+    const warning=document.createElement('p');warning.textContent='Google Places: '+error.message+' Nenhum dado foi gravado.';
+    box.prepend(warning);
+  }finally{placesBusy=false;more.disabled=false;}
+}
+$('form-places').addEventListener('submit',e=>{e.preventDefault();searchPlacesPage(false);});
+$('places-more').addEventListener('click',()=>searchPlacesPage(true));
 async function refreshSources(){
   try{
     const r=await apiFetch('/api/sources');if(!r.ok)throw new Error('não autorizado');
