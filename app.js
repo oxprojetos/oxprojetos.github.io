@@ -313,12 +313,11 @@ async function runMultipleCnaes(cnaes, data) {
         try { result = await response.json(); }
         catch { throw new Error('Resposta HTTP ' + response.status + ' não contém JSON válido.'); }
         if (!response.ok) throw new Error(`CNAE ${cnae}: ${result?.message || result?.error || 'HTTP ' + response.status}`);
-        if (!Array.isArray(result.data)) throw new Error('CNAE ' + cnae + ': resposta sem lista de empresas.');
         const remaining = perCnae - receivedForCnae;
-        const chunk = result.data.slice(0, remaining);
+        // Falhar fechado em respostas malformadas, em vez de omitir empresas silenciosamente.
+        const chunk = readSourcePage(result,{search:true,remaining});
         const previousCount = receivedForCnae;
         for (const item of chunk) {
-          if (!item || typeof item.cnpj !== 'string' || !/^\d{14}$/.test(item.cnpj)) continue;
           if (!seenCompanies.has(item.cnpj)) {
             seenCompanies.add(item.cnpj);
             rows.push(item);
