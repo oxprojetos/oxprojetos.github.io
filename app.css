@@ -298,6 +298,12 @@ body.pro-authenticated #auth-panel{display:none!important}
 }
 
 
+/* EX-EXPORT-03: invalid fragments remain visible but are never clickable. */
+.contact-cell .phone-invalid{color:#68798a;text-decoration:underline dotted #c1c8d1;text-underline-offset:3px}
+/* EX-EXPORT-01: explicit download scope. */
+.export-controls #export-scope{min-width:175px;max-width:260px}
+@media(max-width:680px){.export-controls #export-scope{min-width:0;max-width:100%}}
+
 /* WPP-01: WhatsApp icon visually compact, one action beside each phone.
    The hit area remains 44 x 44 CSS px on touch devices. */
 .contact-cell .phone-line {
