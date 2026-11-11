@@ -4,9 +4,11 @@ import { selectedExportRows } from './export-scope.mjs';
 import { validateCnpj } from './cnpj-validation.mjs';
 import { mobileCandidates, mobileCandidatesDetailed, hasUsablePhone, isUsablePhone, emailAddress, safeExternalUrl } from './contacts.mjs';
 import { addCnaeCodes, describeCnae, MAX_CNAES } from './cnae-multi.mjs';
+import { MAX_SOURCE_PAGES, nextBatchGoal, readSourcePage, nextSourceCursor } from './pagination-control.mjs';
 
 const $ = id => document.getElementById(id);
 let rows = [], cursor = null, page = 0, mode = 'search', query = null, controller = null, tablePage = 1, multiCnaeActive = false;
+let usedPageCursors = new Set();
 const state = { busy: false, requested: 0, complete: false, partialError: false };
 
 let selectedCnaes = ['4731800'];
@@ -67,7 +69,7 @@ function switchMode(newMode) {
 }
 function message(msg, type = '') { $('feedback').textContent = msg; $('feedback').className = `feedback ${type}`; }
 function reset() {
-  rows = []; cursor = null; page = 0; query = null; tablePage = 1; multiCnaeActive = false;
+  rows = []; cursor = null; page = 0; query = null; tablePage = 1; multiCnaeActive = false; usedPageCursors = new Set();
   state.requested = 0; state.complete = false; state.partialError = false;
   $('filter').value = ''; $('city-filter').value = ''; message('Pronto para iniciar uma nova consulta.'); render();
 }
@@ -162,6 +164,9 @@ function render() {
   $('count-phone').textContent = rows.filter(r => hasUsablePhone(r.telefone)).length;
   $('count-email').textContent = rows.filter(r => Boolean(r.email)).length;
   $('count-mobile').textContent = rows.filter(r => mobileCandidates(r.telefone).length > 0).length;
+  const cities = [...new Set(rows.map(r => String(r.municipio ?? '').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')).slice(0,150);
+  const cityList = $('city-suggestions');
+  cityList.replaceChildren(...cities.map(city=>{const option=document.createElement('option'); option.value=city;return option;}));
   const list = filtered(), body = $('records'); body.replaceChildren();
   const perPage = Number($('per-page').value) || 25;
   const pageCount = Math.max(1, Math.ceil(list.length / perPage));
@@ -201,54 +206,63 @@ function render() {
     ? `${exportRows.length} registro(s) selecionado(s) para exportação (${scope === 'filtered' ? 'somente filtrados' : 'todos os carregados'}). A página visual não reduz o arquivo.${state.partialError ? ' Pesquisa parcial: exportação bloqueada.' : ''}`
     : 'Nenhum registro carregado para exportar.';
   $('export').textContent = `Baixar ${exportRows.length} registro(s)`;
-  $('more').hidden = !cursor || mode !== 'search'; $('more').disabled = state.busy;
+  $('more').hidden = !cursor || mode !== 'search' || page >= MAX_SOURCE_PAGES;
+  $('more').disabled = state.busy;
+  $('more').textContent = state.partialError ? 'Tentar novamente o lote interrompido' : 'Carregar outro lote (opcional)';
 }
 async function run(path, more) {
   if (state.busy) return;
-  if (!more) { rows = []; cursor = null; page = 0; tablePage = 1; multiCnaeActive = false; state.complete = false; state.partialError = false; }
+  if (!more) { rows = []; cursor = null; page = 0; tablePage = 1; multiCnaeActive = false; state.complete = false; state.partialError = false; usedPageCursors = new Set(); }
   state.busy = true;
   $('form-search').querySelector('button[type="submit"]').disabled = true;
   $('form-cnpj').querySelector('button[type="submit"]').disabled = true;
   controller?.abort(); controller = new AbortController();
   const request = controller;
   if (!more) state.requested = mode === 'search' ? Number(query?.get('limit') ?? 200) : 1;
-  else state.requested = rows.length + Number(query?.get('limit') ?? 200);
+  else state.requested = nextBatchGoal(rows.length, state.requested, Number(query?.get('limit') ?? 200), state.partialError);
   let url = path, received = 0, newCount = 0;
+  if (more && query && cursor) {
+    const next = new URLSearchParams(query);
+    next.set('cursor',cursor);
+    next.set('limit',String(Math.min(200,state.requested-rows.length)));
+    url = '/api/search?' + next;
+  }
   message(`Consultando fontes: preparando até ${state.requested} registro(s)...`);
   render();
   try {
     const seen = new Set(rows.map(row => row.cnpj));
-    const consultedCursors = new Set();
     while (rows.length < state.requested) {
-      if (page >= 10) throw new Error('Limite de 10 páginas por pesquisa para proteger a API. Reduza a pesquisa.');
+      if (page >= MAX_SOURCE_PAGES) throw new Error('Limite de 10 páginas por pesquisa para proteger a API. Reduza a pesquisa.');
       const beforePage = rows.length;
       const response = await apiFetch(url, { signal: request.signal, headers: { Accept: 'application/json' } });
       let result;
       try { result = await response.json(); } catch { throw new Error(`Resposta HTTP ${response.status} não é JSON válido`); }
       if (!response.ok) throw new Error(`${result.message || result.error || `HTTP ${response.status}`}${result.failures?.length ? ' | Fontes: ' + result.failures.map(f => `${f.fonte} (${f.status})`).join(', ') : ''}`);
-      const list = Array.isArray(result.data) ? result.data : [result.data];
+      const list = readSourcePage(result, {search:mode==='search',remaining:state.requested-rows.length});
       for (const item of list) if (item && !seen.has(item.cnpj)) {
         rows.push(item); seen.add(item.cnpj); newCount++;
         if (rows.length === state.requested) break;
       }
       received += list.length; page++;
-      const previousCursor = cursor;
-      cursor = typeof result.cursor === 'string' && result.cursor ? result.cursor : null;
+      const nextCursor = mode === 'search'
+        ? nextSourceCursor(result.cursor,{previous:cursor,used:usedPageCursors,before:beforePage,after:rows.length})
+        : null;
+      cursor = nextCursor;
+      if (cursor) usedPageCursors.add(cursor);
       message(`Recebidos ${rows.length}/${state.requested} registros. Fonte: ${result.source}.`, 'ok');
       render();
       if (mode !== 'search' || !cursor || !list.length) break;
-      if (rows.length === beforePage || cursor === previousCursor || consultedCursors.has(cursor)) throw new Error('Paginação repetida ou sem novos CNPJs, interrompida por segurança.');
-      consultedCursors.add(cursor);
       const next = new URLSearchParams(query);
       next.set('limit', String(Math.min(200, state.requested - rows.length)));
       next.set('cursor', cursor);
       url = '/api/search?' + next;
     }
     state.complete = true;
+    state.partialError = false; // Ao concluir o retry, liberar novamente a exportação.
     message(`Pesquisa concluída: ${newCount} novo(s), ${rows.length} no total. Solicitados: ${state.requested}. ${rows.length < state.requested ? 'A fonte retornou menos registros disponíveis ou interrompeu a paginação.' : 'Lote completo.'} Exportação inclui todos os carregados.`, 'ok');
   } catch (e) {
     if (e.name !== 'AbortError') {
-      state.partialError = Boolean(rows.length && rows.length < state.requested);
+      state.partialError = Boolean(rows.length); // Qualquer falha com linhas carregadas bloqueia a exportação até retomar.
       message(`Falha: ${e.message}. ${state.partialError ? 'Dados parciais na tela. Complete a consulta antes de exportar.' : 'Nenhum dado fictício foi gerado.'}`, 'error');
     }
   } finally {
@@ -272,7 +286,7 @@ async function runMultipleCnaes(cnaes, data) {
     message('Parâmetros de pesquisa inválidos. Revise os CNAEs e o limite.', 'error');
     return;
   }
-  rows = []; cursor = null; page = 0; tablePage = 1; query = null;
+  rows = []; cursor = null; page = 0; tablePage = 1; query = null; usedPageCursors = new Set();
   multiCnaeActive = true;
   state.busy = true; state.complete = false; state.partialError = false;
   state.requested = cnaes.length * perCnae;
@@ -299,12 +313,11 @@ async function runMultipleCnaes(cnaes, data) {
         try { result = await response.json(); }
         catch { throw new Error('Resposta HTTP ' + response.status + ' não contém JSON válido.'); }
         if (!response.ok) throw new Error(`CNAE ${cnae}: ${result?.message || result?.error || 'HTTP ' + response.status}`);
-        if (!Array.isArray(result.data)) throw new Error('CNAE ' + cnae + ': resposta sem lista de empresas.');
         const remaining = perCnae - receivedForCnae;
-        const chunk = result.data.slice(0, remaining);
+        // Falhar fechado em respostas malformadas, em vez de omitir empresas silenciosamente.
+        const chunk = readSourcePage(result,{search:true,remaining});
         const previousCount = receivedForCnae;
         for (const item of chunk) {
-          if (!item || typeof item.cnpj !== 'string' || !/^\d{14}$/.test(item.cnpj)) continue;
           if (!seenCompanies.has(item.cnpj)) {
             seenCompanies.add(item.cnpj);
             rows.push(item);
