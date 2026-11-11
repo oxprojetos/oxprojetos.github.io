@@ -75,6 +75,16 @@
       <div id="enrich-result" class="small-result" role="status">Ainda não foi consultado um site.</div>
       <button id="apply-enrich" type="button" hidden>Adicionar dados encontrados à empresa carregada (somente nesta tela)</button>
     </section>
+    <section class="card extra-tools" id="social-links-panel">
+      <div class="tools-heading"><div><h2>Validar links de redes sociais</h2><p>Informe links que você já possui, um por linha. A ferramenta valida o formato sem consultar redes, sem confirmar a titularidade e sem associar automaticamente a CNPJ.</p></div><span class="mini-status">Sem scraping · sem cobrança</span></div>
+      <form id="form-social-links" class="fields secondary-fields">
+        <label>Perfis informados (até 8, um por linha)
+          <textarea class="social-links-input" name="links" rows="3" maxlength="1400" required placeholder="https://instagram.com/empresa&#10;https://www.linkedin.com/company/empresa"></textarea>
+        </label>
+        <button type="submit">Validar links fornecidos</button>
+      </form>
+      <div id="social-links-result" class="small-result" role="status">Instagram, Facebook, LinkedIn, YouTube, TikTok e X: validação de URLs, sem consulta às APIs das plataformas.</div>
+    </section>
     <section class="card extra-tools">
       <div class="tools-heading"><div><h2>Google Places oficial (opcional)</h2><p>Consulta temporária de estabelecimentos. Requer chave privada do Google Maps Platform e habilitação explícita; pode gerar cobrança. Não será armazenada nem exportada como base comercial.</p></div><span class="mini-status">Sem scraping de Maps</span></div>
       <form id="form-places" class="fields secondary-fields">
@@ -82,7 +92,8 @@
         <label>Resultados <select name="limit"><option>5</option><option selected>10</option><option>20</option></select></label>
         <button class="primary" type="submit">Consultar Google Places</button>
       </form>
-      <div id="places-result" class="small-result" role="status">Integração desabilitada por padrão. Se não houver chave, mostraremos instruções de configuração.</div>
+      <div id="places-result" class="small-result" role="status">Integração desabilitada por padrão. Requer billing aprovado, chave privada e limite de custo no servidor. Telefones/sites usam campos de SKU superior, também desabilitados.</div>
+      <button id="places-more" type="button" hidden>Carregar mais locais (até 60 no total)</button>
     </section>
     <section class="card extra-tools">
       <h2>Fontes e integrações desta versão</h2>
