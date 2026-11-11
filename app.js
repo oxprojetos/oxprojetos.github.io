@@ -1,7 +1,8 @@
 import { apiFetch,signIn,signOut,loggedIn,configured,beginPasswordSetup,requestPasswordReset,updatePassword } from './ox-auth.mjs';
 import { exportBytes } from './exporters.mjs';
+import { selectedExportRows } from './export-scope.mjs';
 import { validateCnpj } from './cnpj-validation.mjs';
-import { mobileCandidates, mobileCandidatesDetailed, emailAddress, safeExternalUrl } from './contacts.mjs';
+import { mobileCandidates, mobileCandidatesDetailed, hasUsablePhone, isUsablePhone, emailAddress, safeExternalUrl } from './contacts.mjs';
 import { addCnaeCodes, describeCnae, MAX_CNAES } from './cnae-multi.mjs';
 
 const $ = id => document.getElementById(id);
@@ -74,7 +75,7 @@ function filtered() {
   const q = $('filter').value.trim().toLocaleLowerCase('pt-BR');
   return rows.filter(r => {
     if ($('active').checked && r.situacao !== 'ATIVA') return false;
-    if ($('contact').checked && !r.telefone && !r.email) return false;
+    if ($('contact').checked && !hasUsablePhone(r.telefone) && !emailAddress(r.email)) return false;
     if (!q) return true;
     return [r.cnpj,r.razao_social,r.nome_fantasia,r.municipio,r.uf,r.telefone,r.email,r.website].join(' ').toLocaleLowerCase('pt-BR').includes(q);
   });
@@ -118,6 +119,7 @@ function phoneCell(tr, row) {
     const val = document.createElement('span');
     val.className = 'phone-number';
     val.textContent = rawPhone;
+    if(rawPhone !== '—' && !isUsablePhone(rawPhone)) { val.classList.add('phone-invalid'); val.title = 'Número inválido ou não verificável; mantido como recebido da fonte.'; }
     line.append(val);
     // Link somente para candidato de celular, sem validação de conta nem envio.
     for (const candidate of mobileCandidatesDetailed(rawPhone)) {
@@ -152,7 +154,7 @@ function socialCell(tr, row) {
 function render() {
   $('count-total').textContent = rows.length;
   $('count-active').textContent = rows.filter(r => r.situacao === 'ATIVA').length;
-  $('count-phone').textContent = rows.filter(r => Boolean(r.telefone)).length;
+  $('count-phone').textContent = rows.filter(r => hasUsablePhone(r.telefone)).length;
   $('count-email').textContent = rows.filter(r => Boolean(r.email)).length;
   $('count-mobile').textContent = rows.filter(r => mobileCandidates(r.telefone).length > 0).length;
   const list = filtered(), body = $('records'); body.replaceChildren();
@@ -186,9 +188,14 @@ function render() {
   $('prev-table').disabled = tablePage <= 1;
   $('next-table').disabled = tablePage >= pageCount;
   $('table-page').textContent = `Página ${tablePage} de ${pageCount}`;
-  $('export-format').disabled = !rows.length || state.busy || state.partialError;
-  $('export').disabled = !rows.length || state.busy || state.partialError;
-  $('export-count').textContent = rows.length ? `Exportação: ${rows.length} registros (TODOS os carregados, independente da página e dos filtros da tela).` : 'A exportação não depende da página visual.';
+  const scope = $('export-scope').value;
+  const exportRows = selectedExportRows(rows, list, scope);
+  $('export-format').disabled = !exportRows.length || state.busy || state.partialError;
+  $('export').disabled = !exportRows.length || state.busy || state.partialError;
+  $('export-count').textContent = rows.length
+    ? `${exportRows.length} registro(s) selecionado(s) para exportação (${scope === 'filtered' ? 'somente filtrados' : 'todos os carregados'}). A página visual não reduz o arquivo.${state.partialError ? ' Pesquisa parcial: exportação bloqueada.' : ''}`
+    : 'Nenhum registro carregado para exportar.';
+  $('export').textContent = `Baixar ${exportRows.length} registro(s)`;
   $('more').hidden = !cursor || mode !== 'search'; $('more').disabled = state.busy;
 }
 async function run(path, more) {
@@ -363,22 +370,25 @@ $('more').addEventListener('click', () => {
   run('/api/search?' + next, true);
 });
 for (const id of ['filter', 'active', 'contact']) $(id).addEventListener(id === 'filter' ? 'input' : 'change', () => { tablePage = 1; render(); });
+$('export-scope').addEventListener('change', render);
 $('per-page').addEventListener('change', () => { tablePage = 1; render(); });
 $('prev-table').addEventListener('click', () => { tablePage--; render(); });
 $('next-table').addEventListener('click', () => { tablePage++; render(); });
 $('export').addEventListener('click', () => {
   if (state.busy || state.partialError || !rows.length) return;
-  const format = $('export-format').value;
+  const format = $('export-format').value, scope = $('export-scope').value;
+  const exporting = selectedExportRows(rows, filtered(), scope);
+  if(!exporting.length) return;
   try {
-    // rows representa TODOS os registros efetivamente recebidos; filtered() e página visual NÃO reduzem a exportação.
-    const bytes = exportBytes(rows, format);
+    // Exporta somente o escopo explicitamente escolhido; paginação visual não reduz o conjunto.
+    const bytes = exportBytes(exporting, format);
     const types = { csv: 'text/csv;charset=utf-8', xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
     const blob = new Blob([bytes], { type: types[format] });
     const url = URL.createObjectURL(blob), a = document.createElement('a');
-    a.href = url; a.download = `OX_pesquisa_${rows.length}_empresas.${format}`;
+    a.href = url; a.download = `OX_pesquisa_${exporting.length}_empresas_${scope === 'filtered' ? 'filtradas' : 'todas'}.${format}`;
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    message(`Exportação ${format.toUpperCase()} gerada com ${rows.length} registros de toda a pesquisa, não apenas desta página da tabela.`, 'ok');
+    message(`Exportação ${format.toUpperCase()} gerada com ${exporting.length} registros ${scope === 'filtered' ? 'filtrados' : 'carregados'}, independentemente da página visual.`, 'ok');
   } catch (e) { message(`Erro ao gerar ${format.toUpperCase()}: ${e.message}`, 'error'); }
 });
 render();
