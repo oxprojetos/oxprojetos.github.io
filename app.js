@@ -531,15 +531,17 @@ async function searchPlacesPage(append=false){
 }
 $('form-places').addEventListener('submit',e=>{e.preventDefault();searchPlacesPage(false);});
 $('places-more').addEventListener('click',()=>searchPlacesPage(true));
+function renderSources(z){
+  const labels={minhareceita:'Minha Receita',opencnpj:'OpenCNPJ',brasilapi:'BrasilAPI',cnpjws:'CNPJ.ws',rictom_local:'rictom local',website_social:'Redes de sites empresariais',google_places:'Google Places',supabase:'Supabase'};
+  $('sources-detail').textContent=Object.entries(labels).map(([key,label])=>`${label}: ${z[key]??'não configurado'}`).join(' | ');
+}
 async function refreshSources(){
   try{
     const r=await apiFetch('/api/sources');if(!r.ok)throw new Error('não autorizado');
-    const z=await r.json();
-    const labels={minhareceita:'Minha Receita',opencnpj:'OpenCNPJ',brasilapi:'BrasilAPI',cnpjws:'CNPJ.ws',rictom_local:'rictom local',website_social:'Redes de sites empresariais',google_places:'Google Places',supabase:'Supabase'};
-    $('sources-detail').textContent=Object.entries(labels).map(([key,label])=>`${label}: ${z[key]??'não configurado'}`).join(' | ');
+    renderSources(await r.json());
   }catch{$('sources-detail').textContent='Fontes disponíveis após autenticação. Confira sua sessão.';}
 }
-function authState(){
+function authState(preloadedSources=null){
   const ok=loggedIn();
   $('auth-login').hidden=ok;
   $('auth-logout').hidden=!ok;
@@ -547,13 +549,26 @@ function authState(){
   for(const formId of ['form-search','form-cnpj'])$(formId).querySelector('button[type="submit"]').disabled=!ok;
   $('form-places').querySelector('button[type="submit"]').disabled=!ok;
   $('form-enrich').querySelector('button[type="submit"]').disabled=true;
-  if(ok)refreshSources();else $('sources-detail').textContent='Faça login para consultar as fontes.';
+  if(ok){if(preloadedSources)renderSources(preloadedSources);else refreshSources();}
+  else $('sources-detail').textContent='Faça login para consultar as fontes.';
 }
 $('auth-login').addEventListener('submit',async e=>{
-  e.preventDefault();const d=new FormData(e.currentTarget);
+  e.preventDefault();const form=e.currentTarget,d=new FormData(form);
   $('auth-feedback').textContent='Validando acesso...';
-  try{await signIn(String(d.get('email')||''),String(d.get('password')||''));$('auth-feedback').textContent='Acesso autorizado.';authState();}
-  catch(err){$('auth-feedback').textContent=err.message;}
+  try{
+    await signIn(String(d.get('email')||''),String(d.get('password')||''));
+    const access=await apiFetch('/api/sources');
+    if(access.status===401||access.status===403)throw new Error('Conta autenticada, mas sem permissão de pesquisa.');
+    if(!access.ok)throw new Error('Não foi possível verificar sua permissão. Tente novamente.');
+    const sources=await access.json();
+    $('auth-feedback').textContent='Acesso autorizado.';
+    authState(sources);
+  }catch(err){
+    signOut();authState();
+    $('auth-feedback').textContent=err.message;
+  }finally{
+    form.querySelector('input[name="password"]').value='';
+  }
 });
 $('auth-logout').addEventListener('click',()=>{signOut();reset();authState();});
 if(!configured())$('auth-feedback').textContent='Publicação ainda não configurada: falta vincular um Supabase exclusivo.';
