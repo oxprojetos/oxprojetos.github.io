@@ -4,9 +4,11 @@ import { selectedExportRows } from './export-scope.mjs';
 import { validateCnpj } from './cnpj-validation.mjs';
 import { mobileCandidates, mobileCandidatesDetailed, hasUsablePhone, isUsablePhone, emailAddress, safeExternalUrl } from './contacts.mjs';
 import { addCnaeCodes, describeCnae, MAX_CNAES } from './cnae-multi.mjs';
+import { MAX_SOURCE_PAGES, nextBatchGoal, readSourcePage, nextSourceCursor } from './pagination-control.mjs';
 
 const $ = id => document.getElementById(id);
 let rows = [], cursor = null, page = 0, mode = 'search', query = null, controller = null, tablePage = 1, multiCnaeActive = false;
+let usedPageCursors = new Set();
 const state = { busy: false, requested: 0, complete: false, partialError: false };
 
 let selectedCnaes = ['4731800'];
@@ -67,7 +69,7 @@ function switchMode(newMode) {
 }
 function message(msg, type = '') { $('feedback').textContent = msg; $('feedback').className = `feedback ${type}`; }
 function reset() {
-  rows = []; cursor = null; page = 0; query = null; tablePage = 1; multiCnaeActive = false;
+  rows = []; cursor = null; page = 0; query = null; tablePage = 1; multiCnaeActive = false; usedPageCursors = new Set();
   state.requested = 0; state.complete = false; state.partialError = false;
   $('filter').value = ''; $('city-filter').value = ''; message('Pronto para iniciar uma nova consulta.'); render();
 }
@@ -162,6 +164,9 @@ function render() {
   $('count-phone').textContent = rows.filter(r => hasUsablePhone(r.telefone)).length;
   $('count-email').textContent = rows.filter(r => Boolean(r.email)).length;
   $('count-mobile').textContent = rows.filter(r => mobileCandidates(r.telefone).length > 0).length;
+  const cities = [...new Set(rows.map(r => String(r.municipio ?? '').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR')).slice(0,150);
+  const cityList = $('city-suggestions');
+  cityList.replaceChildren(...cities.map(city=>{const option=document.createElement('option'); option.value=city;return option;}));
   const list = filtered(), body = $('records'); body.replaceChildren();
   const perPage = Number($('per-page').value) || 25;
   const pageCount = Math.max(1, Math.ceil(list.length / perPage));
@@ -201,54 +206,63 @@ function render() {
     ? `${exportRows.length} registro(s) selecionado(s) para exportação (${scope === 'filtered' ? 'somente filtrados' : 'todos os carregados'}). A página visual não reduz o arquivo.${state.partialError ? ' Pesquisa parcial: exportação bloqueada.' : ''}`
     : 'Nenhum registro carregado para exportar.';
   $('export').textContent = `Baixar ${exportRows.length} registro(s)`;
-  $('more').hidden = !cursor || mode !== 'search'; $('more').disabled = state.busy;
+  $('more').hidden = !cursor || mode !== 'search' || page >= MAX_SOURCE_PAGES;
+  $('more').disabled = state.busy;
+  $('more').textContent = state.partialError ? 'Tentar novamente o lote interrompido' : 'Carregar outro lote (opcional)';
 }
 async function run(path, more) {
   if (state.busy) return;
-  if (!more) { rows = []; cursor = null; page = 0; tablePage = 1; multiCnaeActive = false; state.complete = false; state.partialError = false; }
+  if (!more) { rows = []; cursor = null; page = 0; tablePage = 1; multiCnaeActive = false; state.complete = false; state.partialError = false; usedPageCursors = new Set(); }
   state.busy = true;
   $('form-search').querySelector('button[type="submit"]').disabled = true;
   $('form-cnpj').querySelector('button[type="submit"]').disabled = true;
   controller?.abort(); controller = new AbortController();
   const request = controller;
   if (!more) state.requested = mode === 'search' ? Number(query?.get('limit') ?? 200) : 1;
-  else state.requested = rows.length + Number(query?.get('limit') ?? 200);
+  else state.requested = nextBatchGoal(rows.length, state.requested, Number(query?.get('limit') ?? 200), state.partialError);
   let url = path, received = 0, newCount = 0;
+  if (more && query && cursor) {
+    const next = new URLSearchParams(query);
+    next.set('cursor',cursor);
+    next.set('limit',String(Math.min(200,state.requested-rows.length)));
+    url = '/api/search?' + next;
+  }
   message(`Consultando fontes: preparando até ${state.requested} registro(s)...`);
   render();
   try {
     const seen = new Set(rows.map(row => row.cnpj));
-    const consultedCursors = new Set();
     while (rows.length < state.requested) {
-      if (page >= 10) throw new Error('Limite de 10 páginas por pesquisa para proteger a API. Reduza a pesquisa.');
+      if (page >= MAX_SOURCE_PAGES) throw new Error('Limite de 10 páginas por pesquisa para proteger a API. Reduza a pesquisa.');
       const beforePage = rows.length;
       const response = await apiFetch(url, { signal: request.signal, headers: { Accept: 'application/json' } });
       let result;
       try { result = await response.json(); } catch { throw new Error(`Resposta HTTP ${response.status} não é JSON válido`); }
       if (!response.ok) throw new Error(`${result.message || result.error || `HTTP ${response.status}`}${result.failures?.length ? ' | Fontes: ' + result.failures.map(f => `${f.fonte} (${f.status})`).join(', ') : ''}`);
-      const list = Array.isArray(result.data) ? result.data : [result.data];
+      const list = readSourcePage(result, {search:mode==='search',remaining:state.requested-rows.length});
       for (const item of list) if (item && !seen.has(item.cnpj)) {
         rows.push(item); seen.add(item.cnpj); newCount++;
         if (rows.length === state.requested) break;
       }
       received += list.length; page++;
-      const previousCursor = cursor;
-      cursor = typeof result.cursor === 'string' && result.cursor ? result.cursor : null;
+      const nextCursor = mode === 'search'
+        ? nextSourceCursor(result.cursor,{previous:cursor,used:usedPageCursors,before:beforePage,after:rows.length})
+        : null;
+      cursor = nextCursor;
+      if (cursor) usedPageCursors.add(cursor);
       message(`Recebidos ${rows.length}/${state.requested} registros. Fonte: ${result.source}.`, 'ok');
       render();
       if (mode !== 'search' || !cursor || !list.length) break;
-      if (rows.length === beforePage || cursor === previousCursor || consultedCursors.has(cursor)) throw new Error('Paginação repetida ou sem novos CNPJs, interrompida por segurança.');
-      consultedCursors.add(cursor);
       const next = new URLSearchParams(query);
       next.set('limit', String(Math.min(200, state.requested - rows.length)));
       next.set('cursor', cursor);
       url = '/api/search?' + next;
     }
     state.complete = true;
+    state.partialError = false; // Ao concluir o retry, liberar novamente a exportação.
     message(`Pesquisa concluída: ${newCount} novo(s), ${rows.length} no total. Solicitados: ${state.requested}. ${rows.length < state.requested ? 'A fonte retornou menos registros disponíveis ou interrompeu a paginação.' : 'Lote completo.'} Exportação inclui todos os carregados.`, 'ok');
   } catch (e) {
     if (e.name !== 'AbortError') {
-      state.partialError = Boolean(rows.length && rows.length < state.requested);
+      state.partialError = Boolean(rows.length); // Qualquer falha com linhas carregadas bloqueia a exportação até retomar.
       message(`Falha: ${e.message}. ${state.partialError ? 'Dados parciais na tela. Complete a consulta antes de exportar.' : 'Nenhum dado fictício foi gerado.'}`, 'error');
     }
   } finally {
@@ -272,7 +286,7 @@ async function runMultipleCnaes(cnaes, data) {
     message('Parâmetros de pesquisa inválidos. Revise os CNAEs e o limite.', 'error');
     return;
   }
-  rows = []; cursor = null; page = 0; tablePage = 1; query = null;
+  rows = []; cursor = null; page = 0; tablePage = 1; query = null; usedPageCursors = new Set();
   multiCnaeActive = true;
   state.busy = true; state.complete = false; state.partialError = false;
   state.requested = cnaes.length * perCnae;
@@ -299,12 +313,11 @@ async function runMultipleCnaes(cnaes, data) {
         try { result = await response.json(); }
         catch { throw new Error('Resposta HTTP ' + response.status + ' não contém JSON válido.'); }
         if (!response.ok) throw new Error(`CNAE ${cnae}: ${result?.message || result?.error || 'HTTP ' + response.status}`);
-        if (!Array.isArray(result.data)) throw new Error('CNAE ' + cnae + ': resposta sem lista de empresas.');
         const remaining = perCnae - receivedForCnae;
-        const chunk = result.data.slice(0, remaining);
+        // Falhar fechado em respostas malformadas, em vez de omitir empresas silenciosamente.
+        const chunk = readSourcePage(result,{search:true,remaining});
         const previousCount = receivedForCnae;
         for (const item of chunk) {
-          if (!item || typeof item.cnpj !== 'string' || !/^\d{14}$/.test(item.cnpj)) continue;
           if (!seenCompanies.has(item.cnpj)) {
             seenCompanies.add(item.cnpj);
             rows.push(item);
@@ -435,27 +448,100 @@ $('apply-enrich').addEventListener('click',()=>{
   item.fonte_site='website_public_links';item.consultado_site_em=latestEnrichment.coletado_em;
   render();message(`Links adicionados apenas à tabela local para ${target}. Nenhum banco de dados foi modificado.`, 'ok');
 });
-$('form-places').addEventListener('submit',async e=>{
-  e.preventDefault();const d=new FormData(e.currentTarget);const box=$('places-result');box.textContent='Consultando Google Places...';
+$('form-social-links').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const box=$('social-links-result');
+  const values=String(new FormData(e.currentTarget).get('links')??'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  if(!values.length||values.length>8){box.textContent='Informe de 1 a 8 links, cada um em uma linha.';return;}
+  const params=new URLSearchParams();
+  for(const value of values)params.append('url',value);
+  if(params.toString().length>1250){box.textContent='Links muito longos. Reduza a lista.';return;}
+  box.textContent='Validando apenas o formato dos links informados...';
   try{
-    const res=await apiFetch('/api/places/search?'+new URLSearchParams({q:d.get('q'),limit:d.get('limit')}));const out=await res.json();
+    const res=await apiFetch('/api/social/validate?'+params);
+    const out=await res.json();
     if(!res.ok)throw new Error(out.message||out.error||`HTTP ${res.status}`);
+    if(!Array.isArray(out.data)||out.source!=='provided_links_only')throw new Error('Resposta inválida do validador.');
     box.replaceChildren();
-    const note=document.createElement('p');note.textContent=`${out.count} locais encontrados. Fonte: Google Maps. Consulta temporária, não associada a CNPJ e sem exportação.`;box.append(note);
-    for(const p of out.data){const line=document.createElement('p');line.textContent=`${p.nome} | ${p.endereco} `;
-      if(p.mapa){const a=document.createElement('a');a.textContent='Abrir no Google Maps';a.href=p.mapa;a.rel='noopener noreferrer';a.target='_blank';line.append(a);}box.append(line);}
-    const attr=document.createElement('p');attr.textContent='Dados e atribuição: Google Maps';box.append(attr);
-  }catch(e){box.textContent='Google Places: '+e.message;}
+    const note=document.createElement('p');
+    note.textContent=`${out.accepted} link(s) aceito(s), ${out.rejected} rejeitado(s). Os links foram informados por você e não tiveram existência, titularidade ou CNPJ verificados.`;
+    box.append(note);
+    const links=document.createElement('div');
+    const platformLabels={instagram:'Instagram',facebook:'Facebook',linkedin:'LinkedIn',youtube:'YouTube',tiktok:'TikTok',x:'X'};
+    for(const item of out.data){
+      const type=String(item.platform||'');
+      const href=safeExternalUrl(item.url,type);
+      if(!href||!platformLabels[type])continue;
+      const a=document.createElement('a');a.textContent=platformLabels[type]+' · '+href;a.href=href;
+      a.target='_blank';a.rel='noopener noreferrer';a.className='social-link';links.append(a);
+    }
+    box.append(links);
+  }catch(error){box.textContent='Validação de links: '+error.message;}
 });
+
+let placesQuery=null,placesCursor=null,placesPages=0,placesCount=0,placesBusy=false;
+let placeIds=new Set();
+async function searchPlacesPage(append=false){
+  if(placesBusy||!loggedIn())return;
+  const box=$('places-result'),more=$('places-more'),form=$('form-places');
+  if(!append){
+    const data=new FormData(form);
+    placesQuery={q:String(data.get('q')??'').trim(),limit:String(data.get('limit')??'10')};
+    placesCursor=null;placesPages=0;placesCount=0;placeIds=new Set();box.replaceChildren();
+  }
+  if(!placesQuery||append&&!placesCursor||placesPages>=3||placesCount>=60)return;
+  placesBusy=true;more.disabled=true;more.hidden=true;
+  const request=new URLSearchParams(placesQuery);
+  if(append)request.set('cursor',placesCursor);
+  const priorCursor=placesCursor;
+  const info=document.createElement('p');info.textContent='Consultando fonte Google Places (somente quando habilitada no servidor)...';
+  box.append(info);
+  try{
+    const res=await apiFetch('/api/places/search?'+request);
+    const out=await res.json();
+    if(!res.ok)throw new Error(out.message||out.error||`HTTP ${res.status}`);
+    if(!Array.isArray(out.data)||out.source!=='google_places_official')throw new Error('Resposta Places inválida.');
+    info.remove();
+    for(const p of out.data){
+      if(!p||typeof p.id!=='string'||placeIds.has(p.id))continue;
+      placeIds.add(p.id);placesCount++;
+      const line=document.createElement('p');line.textContent=`${p.nome||'Local'} | ${p.endereco||'Endereço não informado'} `;
+      const href=safeExternalUrl(p.mapa);
+      if(href){
+        const host=new URL(href).hostname.toLowerCase();
+        if(['google.com','www.google.com','maps.google.com','maps.app.goo.gl'].includes(host)){
+          const a=document.createElement('a');a.textContent='Abrir no Google Maps';a.href=href;
+          a.rel='noopener noreferrer';a.target='_blank';line.append(a);
+        }
+      }
+      box.append(line);
+    }
+    placesPages++;
+    const next=typeof out.nextPageToken==='string'&&out.nextPageToken.length<=512?out.nextPageToken:null;
+    if(next&&next===priorCursor)throw new Error('Cursor Places repetido.');
+    placesCursor=next;
+    const note=document.createElement('p');note.textContent=`${placesCount} locais carregados em ${placesPages} página(s). Fonte: Google Maps. Dados transitórios, não vinculados a CNPJ e não exportados.`;
+    box.prepend(note);
+    more.hidden=!(placesCursor&&placesPages<3&&placesCount<60);
+  }catch(error){
+    info.remove();placesCursor=null;
+    const warning=document.createElement('p');warning.textContent='Google Places: '+error.message+' Nenhum dado foi gravado.';
+    box.prepend(warning);
+  }finally{placesBusy=false;more.disabled=false;}
+}
+$('form-places').addEventListener('submit',e=>{e.preventDefault();searchPlacesPage(false);});
+$('places-more').addEventListener('click',()=>searchPlacesPage(true));
+function renderSources(z){
+  const labels={minhareceita:'Minha Receita',opencnpj:'OpenCNPJ',brasilapi:'BrasilAPI',cnpjws:'CNPJ.ws',rictom_local:'rictom local',website_social:'Redes de sites empresariais',google_places:'Google Places',supabase:'Supabase'};
+  $('sources-detail').textContent=Object.entries(labels).map(([key,label])=>`${label}: ${z[key]??'não configurado'}`).join(' | ');
+}
 async function refreshSources(){
   try{
     const r=await apiFetch('/api/sources');if(!r.ok)throw new Error('não autorizado');
-    const z=await r.json();
-    const labels={minhareceita:'Minha Receita',opencnpj:'OpenCNPJ',brasilapi:'BrasilAPI',cnpjws:'CNPJ.ws',rictom_local:'rictom local',website_social:'Redes de sites empresariais',google_places:'Google Places',supabase:'Supabase'};
-    $('sources-detail').textContent=Object.entries(labels).map(([key,label])=>`${label}: ${z[key]??'não configurado'}`).join(' | ');
+    renderSources(await r.json());
   }catch{$('sources-detail').textContent='Fontes disponíveis após autenticação. Confira sua sessão.';}
 }
-function authState(){
+function authState(preloadedSources=null){
   const ok=loggedIn();
   $('auth-login').hidden=ok;
   $('auth-logout').hidden=!ok;
@@ -463,13 +549,26 @@ function authState(){
   for(const formId of ['form-search','form-cnpj'])$(formId).querySelector('button[type="submit"]').disabled=!ok;
   $('form-places').querySelector('button[type="submit"]').disabled=!ok;
   $('form-enrich').querySelector('button[type="submit"]').disabled=true;
-  if(ok)refreshSources();else $('sources-detail').textContent='Faça login para consultar as fontes.';
+  if(ok){if(preloadedSources)renderSources(preloadedSources);else refreshSources();}
+  else $('sources-detail').textContent='Faça login para consultar as fontes.';
 }
 $('auth-login').addEventListener('submit',async e=>{
-  e.preventDefault();const d=new FormData(e.currentTarget);
+  e.preventDefault();const form=e.currentTarget,d=new FormData(form);
   $('auth-feedback').textContent='Validando acesso...';
-  try{await signIn(String(d.get('email')||''),String(d.get('password')||''));$('auth-feedback').textContent='Acesso autorizado.';authState();}
-  catch(err){$('auth-feedback').textContent=err.message;}
+  try{
+    await signIn(String(d.get('email')||''),String(d.get('password')||''));
+    const access=await apiFetch('/api/sources');
+    if(access.status===401||access.status===403)throw new Error('Conta autenticada, mas sem permissão de pesquisa.');
+    if(!access.ok)throw new Error('Não foi possível verificar sua permissão. Tente novamente.');
+    const sources=await access.json();
+    $('auth-feedback').textContent='Acesso autorizado.';
+    authState(sources);
+  }catch(err){
+    signOut();authState();
+    $('auth-feedback').textContent=err.message;
+  }finally{
+    form.querySelector('input[name="password"]').value='';
+  }
 });
 $('auth-logout').addEventListener('click',()=>{signOut();reset();authState();});
 if(!configured())$('auth-feedback').textContent='Publicação ainda não configurada: falta vincular um Supabase exclusivo.';
